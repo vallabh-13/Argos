@@ -18,6 +18,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Kafka sink — only needed to publish spans to the pipeline (Phase 2+).
+# Console-only users don't install this.  `pip install -e "sdk[kafka]"`
+kafka = ["confluent-kafka>=2.0"]
 # Installed in CI and for local development: `pip install -e "sdk[dev]"`
 dev = ["pytest>=7.0"]
 

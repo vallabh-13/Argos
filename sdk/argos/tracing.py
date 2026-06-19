@@ -37,6 +37,7 @@ from opentelemetry.trace import (
 )
 
 from .redaction import redact_mapping
+from .sinks import console_sink
 from .span import Span, Status, StepType, _utc_now
 
 # --- module-level configuration, set by init_tracing() --------------------
@@ -45,9 +46,9 @@ _extra_denylist_keys: Optional[Iterable[str]] = None
 _extra_patterns: Optional[Iterable[Any]] = None
 _tracer: Optional[ot_trace.Tracer] = None
 
-# The "sink" is where finished spans go. Phase 1 prints them; later phases
-# replace this with a Kafka producer. Swappable so the public API never changes.
-_sink: Callable[[Span], None] = lambda span: print(span.to_json())
+# The "sink" is where finished spans go. Defaults to printing JSON; pass a
+# KafkaSink (or any callable) to init_tracing to change the destination.
+_sink: Callable[[Span], None] = console_sink
 
 
 def init_tracing(

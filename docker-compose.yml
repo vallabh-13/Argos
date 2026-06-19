@@ -1,50 +1,94 @@
-# Argos — one-command local stack (SKELETON ONLY).
+# Argos local stack — Phase 2: Kafka (ingestion buffer) + ClickHouse (storage).
 #
-# Phase 0: this file documents the intended architecture but starts NOTHING.
-# Every service is commented out and will be filled in during the phase noted
-# beside it. Running `docker compose up` now is a no-op by design.
+#   app (Argos SDK) --> Kafka topic "argos.spans" --> consumer --> ClickHouse
 #
-# Data flow (see docs/PROJECT.md §03):
-#   app → kafka → correlation-engine → clickhouse → grafana
-#                                   └→ detection → prometheus → grafana
+# Bring it up with:   docker compose up -d
+# The consumer and demo run on your host (Phase 2); they're containerized later.
+#
+# Data survives restarts because each service writes to a NAMED VOLUME (declared
+# at the bottom). `docker compose restart` or `down`+`up` keeps them; only
+# `docker compose down -v` wipes them.
 
 services:
-  # ── Ingestion buffer (Phase 2) ──────────────────────────────────────────
-  # Absorbs bursts of incoming spans so nothing downstream gets overwhelmed.
-  # zookeeper:
-  #   image: confluentinc/cp-zookeeper:latest
-  #   # TODO Phase 2: ports, env, healthcheck
+  # ── Kafka — single broker in KRaft mode (no Zookeeper) ──────────────────
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: argos-kafka
+    ports:
+      # Host programs (SDK, consumer) connect here:
+      - "29092:29092"
+    environment:
+      # --- KRaft: this one node is both broker and controller ---
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@localhost:9093"
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # Fixed cluster id so the persisted volume stays valid across restarts.
+      CLUSTER_ID: "5L6g3nShT-eMCtK--X86sw"
 
-  # kafka:
-  #   image: confluentinc/cp-kafka:latest
-  #   # TODO Phase 2: depends_on zookeeper; topic argos.spans
+      # --- THE LISTENER GOTCHA (read this if connections fail) ---
+      # Two ways in: containers on this Docker network use PLAINTEXT://kafka:9092;
+      # your host uses PLAINTEXT_HOST://localhost:29092. A client must be told the
+      # address it can actually reach — that's what ADVERTISED_LISTENERS does.
+      #
+      # NOTE the empty host form "://:9092" (NOT "0.0.0.0"). Empty still binds all
+      # interfaces, but Kafka 3.9's storage-format step validates advertised
+      # listeners and rejects the literal 0.0.0.0 as "nonroutable"; the empty form
+      # auto-resolves to the hostname instead and passes.
+      KAFKA_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093,PLAINTEXT_HOST://:29092"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
 
-  # ── Storage (Phase 2) ───────────────────────────────────────────────────
-  # Column database built for fast queries over huge volumes of trace data.
-  # clickhouse:
-  #   image: clickhouse/clickhouse-server:latest
-  #   # TODO Phase 2: volume clickhouse-data; spans schema
+      # --- single-node replication settings (must be 1; we have one broker) ---
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      # Broker is ready once it can answer an admin API call.
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
 
-  # ── Pipeline (Python services) ──────────────────────────────────────────
-  # ingest-consumer:        # Phase 2 — reads spans off Kafka → ClickHouse
-  #   build: ./backend/ingest
+  # ── ClickHouse — column store for assembled spans ───────────────────────
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: argos-clickhouse
+    environment:
+      # These create the database + user on FIRST boot, and MUST match the
+      # defaults in backend/storage/clickhouse.py::get_client(). Same env var
+      # names on both sides, so one .env file (or shell export) can drive both.
+      # IMPORTANT: only applied when the data volume is empty — see note below.
+      CLICKHOUSE_DB: "${CLICKHOUSE_DB:-argos}"
+      CLICKHOUSE_USER: "${CLICKHOUSE_USER:-argos}"
+      CLICKHOUSE_PASSWORD: "${CLICKHOUSE_PASSWORD:-argos}"
+    ports:
+      - "8123:8123"   # HTTP interface (clickhouse-connect uses this)
+      - "9000:9000"   # native protocol (clickhouse-client)
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      # Auto-create the argos.spans table on first boot (runs only when the data
+      # volume is empty). This is how the schema gets applied with no manual step.
+      - ./backend/storage/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
 
-  # correlation-engine:     # Phase 3 — groups spans by trace_id, rebuilds timeline
-  #   build: ./backend/correlation
-
-  # detection:              # Phase 4 — loops / failures / cost-spike rules
-  #   build: ./backend/detection
-
-  # ── Metrics & dashboards (Phases 4–5) ───────────────────────────────────
-  # prometheus:             # Phase 4 — metrics + alerting
-  #   image: prom/prometheus:latest
-
-  # grafana:                # Phase 5 — trace graph, cost-per-run, alert panel
-  #   image: grafana/grafana:latest
-  #   # TODO Phase 5: ports 3000:3000; provision dashboards from ./dashboard
-
-# Named volumes for service state (kept out of git via .gitignore).
-# volumes:
-#   clickhouse-data:
-#   prometheus-data:
-#   grafana-data:
+# Named volumes = the data that survives restarts. Listed in .gitignore's spirit
+# (Docker manages them outside the repo).
+volumes:
+  kafka-data:
+  clickhouse-data:

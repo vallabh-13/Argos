@@ -14,6 +14,7 @@ and the backend pipeline.
 """
 
 from .span import Span, StepType, Status
+from .sinks import console_sink, KafkaSink
 from .tracing import init_tracing, trace_step, StepRecorder
 
 __all__ = [
@@ -23,6 +24,8 @@ __all__ = [
     "Span",
     "StepType",
     "Status",
+    "console_sink",
+    "KafkaSink",
 ]
 
 __version__ = "0.1.0"

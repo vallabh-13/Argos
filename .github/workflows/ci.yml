@@ -25,10 +25,13 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install the SDK and test dependencies
+      - name: Install the SDK, backend, and test dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e "sdk[dev]"
+          pip install -e "sdk[dev,kafka]"
+          pip install -r backend/requirements.txt
 
       - name: Run pytest
-        run: pytest sdk/tests -v
+        # Unit tests only; the integration test is skipped unless
+        # ARGOS_INTEGRATION=1 (it needs a live Kafka + ClickHouse).
+        run: pytest sdk/tests backend/tests -v

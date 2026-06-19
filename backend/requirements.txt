@@ -1,0 +1,5 @@
+# Argos backend (ingest + storage) runtime dependencies.
+# Install from the repo root:  pip install -r backend/requirements.txt
+
+confluent-kafka>=2.0      # Kafka consumer (reads the argos.spans topic)
+clickhouse-connect>=0.7   # ClickHouse HTTP client (writes the spans table)

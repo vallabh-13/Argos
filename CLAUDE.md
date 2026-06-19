@@ -62,4 +62,7 @@ per-run cost that single-agent tools miss.
   (e.g. "Kafka is overkill at this volume — included to show the prod pattern").
 
 ## Current status
-🔧 Update as you go. Start: "Phase 0 — Foundations."
+🔧 Update as you go.
+- Phase 0 — Foundations: done.
+- Phase 1 — SDK + a span: done.
+- Phase 2 — ingestion pipeline: built; live round-trip pending verification.
