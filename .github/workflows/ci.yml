@@ -1,8 +1,7 @@
 # Argos CI — runs the test suite on every push and pull request.
 #
-# Phase 0: this only runs a trivial placeholder test so the build is green
-# from commit one. Real SDK / backend tests arrive in later phases and will be
-# picked up automatically by pytest below.
+# Installs the SDK (editable) so `import argos` resolves, then runs pytest.
+# As more components land in later phases, add their install/test steps here.
 
 name: CI
 
@@ -26,10 +25,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install test dependencies
+      - name: Install the SDK and test dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest
+          pip install -e "sdk[dev]"
 
       - name: Run pytest
-        run: pytest -v
+        run: pytest sdk/tests -v

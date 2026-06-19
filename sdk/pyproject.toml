@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "argos-sdk"
+version = "0.1.0"
+description = "OpenTelemetry-native distributed tracing for multi-agent AI systems"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Vallabh Mahadik" }]
+keywords = ["opentelemetry", "tracing", "observability", "ai-agents", "mcp", "a2a"]
+
+dependencies = [
+    # The OTel SDK gives us trace/span id generation, timing, and context
+    # propagation. The API package comes along as its dependency.
+    "opentelemetry-sdk>=1.20.0",
+]
+
+[project.optional-dependencies]
+# Installed in CI and for local development: `pip install -e "sdk[dev]"`
+dev = ["pytest>=7.0"]
+
+[tool.setuptools.packages.find]
+# The importable package is `argos`, living directly under sdk/.
+where = ["."]
+include = ["argos*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
