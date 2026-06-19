@@ -1,0 +1,50 @@
+# Argos — one-command local stack (SKELETON ONLY).
+#
+# Phase 0: this file documents the intended architecture but starts NOTHING.
+# Every service is commented out and will be filled in during the phase noted
+# beside it. Running `docker compose up` now is a no-op by design.
+#
+# Data flow (see docs/PROJECT.md §03):
+#   app → kafka → correlation-engine → clickhouse → grafana
+#                                   └→ detection → prometheus → grafana
+
+services:
+  # ── Ingestion buffer (Phase 2) ──────────────────────────────────────────
+  # Absorbs bursts of incoming spans so nothing downstream gets overwhelmed.
+  # zookeeper:
+  #   image: confluentinc/cp-zookeeper:latest
+  #   # TODO Phase 2: ports, env, healthcheck
+
+  # kafka:
+  #   image: confluentinc/cp-kafka:latest
+  #   # TODO Phase 2: depends_on zookeeper; topic argos.spans
+
+  # ── Storage (Phase 2) ───────────────────────────────────────────────────
+  # Column database built for fast queries over huge volumes of trace data.
+  # clickhouse:
+  #   image: clickhouse/clickhouse-server:latest
+  #   # TODO Phase 2: volume clickhouse-data; spans schema
+
+  # ── Pipeline (Python services) ──────────────────────────────────────────
+  # ingest-consumer:        # Phase 2 — reads spans off Kafka → ClickHouse
+  #   build: ./backend/ingest
+
+  # correlation-engine:     # Phase 3 — groups spans by trace_id, rebuilds timeline
+  #   build: ./backend/correlation
+
+  # detection:              # Phase 4 — loops / failures / cost-spike rules
+  #   build: ./backend/detection
+
+  # ── Metrics & dashboards (Phases 4–5) ───────────────────────────────────
+  # prometheus:             # Phase 4 — metrics + alerting
+  #   image: prom/prometheus:latest
+
+  # grafana:                # Phase 5 — trace graph, cost-per-run, alert panel
+  #   image: grafana/grafana:latest
+  #   # TODO Phase 5: ports 3000:3000; provision dashboards from ./dashboard
+
+# Named volumes for service state (kept out of git via .gitignore).
+# volumes:
+#   clickhouse-data:
+#   prometheus-data:
+#   grafana-data:

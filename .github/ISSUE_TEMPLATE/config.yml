@@ -1,0 +1,7 @@
+# Tidies the "New issue" chooser. Setting blank_issues_enabled to false nudges
+# people toward the structured templates above.
+blank_issues_enabled: false
+contact_links:
+  - name: Question or discussion
+    url: https://github.com/<you>/argos/discussions
+    about: For general questions, ideas, or help — please use Discussions, not issues.

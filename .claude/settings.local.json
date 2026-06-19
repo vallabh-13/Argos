@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mv Docs docs_tmp)",
+      "Bash(mv docs_tmp docs)"
+    ]
+  }
+}
