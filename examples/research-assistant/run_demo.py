@@ -1,92 +1,89 @@
-"""Demo — a tiny fake agent that emits one Argos span.
+"""Argos demo — three real agents on AWS Bedrock, traced end to end.
 
-This is intentionally minimal. The full multi-agent research-assistant demo
-(orchestrator → search → summarizer over A2A/MCP) grows here in later phases.
-For now it proves the pipeline and that secret redaction happens *before* a span
-is emitted.
+    orchestrator --(A2A)--> search --(MCP tool)--> ... --(A2A)--> summarizer
 
-Two modes, chosen by an environment variable:
-  * default            -> console sink (prints JSON). Phase 1 behavior.
-  * ARGOS_KAFKA_BOOTSTRAP set -> KafkaSink (publishes to the argos.spans topic).
+Every step is wrapped with the Argos SDK, so real spans flow through the pipeline
+(Kafka -> ClickHouse -> correlation -> detection). The agents exist only to give
+Argos something genuine to trace.
 
-Run it:
-    pip install -e sdk
-    python examples/research-assistant/run_demo.py                  # console
-
-    # Phase 2: send to the pipeline (after `docker compose up -d`)
+Setup (once):
     pip install -e "sdk[kafka]"
-    $env:ARGOS_KAFKA_BOOTSTRAP="localhost:29092"   # PowerShell
-    python examples/research-assistant/run_demo.py
+    pip install -r examples/research-assistant/requirements.txt
+    cp examples/research-assistant/.env.example examples/research-assistant/.env
+    # edit .env: AWS creds + model, OR set ARGOS_BEDROCK_MOCK=1 to skip AWS
+
+Run to the console (no pipeline needed):
+    python examples/research-assistant/run_demo.py --scenario happy
+
+Run into the live pipeline (after `docker compose up -d`):
+    # set ARGOS_KAFKA_BOOTSTRAP=localhost:29092 in .env (or the shell)
+    python examples/research-assistant/run_demo.py --scenario happy
+
+Scenarios:
+    --scenario happy   a clean run that succeeds end to end
+    --scenario fail    the tool returns garbage; the search agent really loops
+                       and retries, tripping the Phase 4 detectors (see step 3)
 """
 
+from __future__ import annotations
+
+import argparse
 import os
+import sys
+from pathlib import Path
 
-from argos import init_tracing, trace_step
+# Make the demo's sibling modules importable no matter where this is launched from.
+sys.path.insert(0, str(Path(__file__).parent))
 
+from argos import init_tracing  # noqa: E402
 
-def fake_search_agent(query: str) -> str:
-    """Pretend to be a search agent doing one tool call.
+from bedrock_client import load_env, make_llm  # noqa: E402
+from agents.orchestrator import orchestrate  # noqa: E402
 
-    We wrap the step in `trace_step` (3 lines) and attach realistic metadata —
-    including two planted secrets — to demonstrate redaction.
-    """
-
-    with trace_step(
-        agent_name="search",
-        step_type="tool_call",
-        name="web.search",
-    ) as step:
-        # Token/cost data — the stuff Argos uses for per-step cost (Phase 3).
-        step.set_usage(model="anthropic.claude-3-haiku", tokens_in=128, tokens_out=64)
-        step.set_cost(0.0011)
-
-        # Ordinary, safe metadata — preserved as-is.
-        step.set_attribute("query", query)
-        step.set_attribute("tool", "web_search_v1")
-        step.set_attribute("results_count", 5)
-
-        # PLANTED SECRET #1 — caught by the key-name denylist ("api_key").
-        step.set_attribute("api_key", "sk-supersecret-DO-NOT-LEAK-1234567890")
-
-        # PLANTED SECRET #2 — caught by value pattern even though the field name
-        # ("debug_note") looks innocent. A real key accidentally pasted in.
-        step.set_attribute(
-            "debug_note",
-            "retry used token Bearer abcdef0123456789ghijkl",
-        )
-
-        # PLANTED SECRET #3 — nested one level down, to show recursion.
-        step.set_attribute("auth", {"password": "hunter2", "user": "demo"})
-
-        return f"(pretend results for: {query})"
+DEFAULT_QUESTION = "What is fusion energy and why does it matter?"
 
 
-def main() -> None:
-    # The whole adoption story: one init line (with a chosen sink), then wrap steps.
+def main(argv: list[str] | None = None) -> int:
+    load_env()  # pull .env in before we read ARGOS_KAFKA_BOOTSTRAP etc.
+
+    parser = argparse.ArgumentParser(prog="run_demo.py", description="Argos multi-agent demo")
+    parser.add_argument("--scenario", choices=["happy", "fail"], default="happy",
+                        help="happy = clean run; fail = tool returns garbage and agents loop")
+    parser.add_argument("--question", default=DEFAULT_QUESTION, help="the research question")
+    parser.add_argument("--sink", choices=["auto", "console", "kafka"], default="auto",
+                        help="where spans go (auto = kafka if ARGOS_KAFKA_BOOTSTRAP set)")
+    args = parser.parse_args(argv)
+
     bootstrap = os.getenv("ARGOS_KAFKA_BOOTSTRAP")
-    if bootstrap:
+    use_kafka = args.sink == "kafka" or (args.sink == "auto" and bootstrap)
+
+    if use_kafka:
+        if not bootstrap:
+            parser.error("--sink kafka needs ARGOS_KAFKA_BOOTSTRAP set")
         from argos import KafkaSink
 
         init_tracing(service="research-assistant", sink=KafkaSink(bootstrap_servers=bootstrap))
-        print(f"=== Argos demo: publishing span to Kafka @ {bootstrap} ===\n")
+        print(f"=== Argos demo - publishing spans to Kafka @ {bootstrap} ===")
     else:
         init_tracing(service="research-assistant")
-        print("=== Argos demo: emitting one span (console) ===\n")
+        print("=== Argos demo - emitting spans to the console ===")
 
-    result = fake_search_agent("latest on fusion energy")
-    print(f"\nAgent returned: {result}")
+    llm = make_llm()
+    print(f"LLM: {llm.describe()}")
+    print(f"Scenario: {args.scenario} | Question: {args.question}\n")
 
-    if bootstrap:
+    answer = orchestrate(llm, args.question, scenario=args.scenario)
+
+    print("\n=== Final answer ===")
+    print(answer)
+
+    if use_kafka:
         print(
-            "\nSpan published to topic 'argos.spans'. Start the consumer and query "
-            "ClickHouse to see it land (see docs/verify-phase2.md)."
+            "\nSpans published to 'argos.spans'. With the consumer + detector running, "
+            "this run will appear in ClickHouse and on the Grafana dashboard."
         )
-    else:
-        print(
-            "\nNotice above: api_key, the Bearer token in debug_note, and the nested "
-            "password all show as [REDACTED] — scrubbed before the span was emitted."
-        )
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

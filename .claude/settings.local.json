@@ -25,7 +25,17 @@
       "Bash(grep -nE '^\\\\s{2}[a-z].*:$|services:|^volumes:' docker-compose.yml)",
       "Bash(curl -s \"http://localhost:3000/api/search?query=Argos\")",
       "Bash(curl -s \"http://localhost:3000/api/datasources/uid/argos-prometheus/health\")",
-      "Bash(curl -s \"http://localhost:3000/api/datasources/uid/argos-clickhouse/health\")"
+      "Bash(curl -s \"http://localhost:3000/api/datasources/uid/argos-clickhouse/health\")",
+      "PowerShell(python -m pytest sdk/tests/ -q)",
+      "PowerShell($env:ARGOS_BEDROCK_MODEL=\"anthropic.claude-3-haiku-20240307-v1:0\"; $env:ARGOS_BEDROCK_MOCK=\"1\"; python examples/research-assistant/run_demo.py --scenario happy --sink console)",
+      "PowerShell($env:ARGOS_BEDROCK_MODEL=\"anthropic.claude-3-haiku-20240307-v1:0\"; $env:ARGOS_BEDROCK_MOCK=\"1\"; python examples/research-assistant/run_demo.py --scenario fail --sink console 2>&1 | Select-String '\"name\":|\"status\":|Final answer' | Select-Object -First 40)",
+      "PowerShell(python -m pytest backend/tests/test_failure_loop_demo.py -v)",
+      "PowerShell(python -m pytest backend/tests/test_failure_loop_demo.py -q)",
+      "PowerShell(python -c \"import json; json.load\\(open\\(r'D:\\\\Argos\\\\deploy\\\\grafana\\\\dashboards\\\\argos-overview.json'\\)\\); print\\('dashboard JSON OK'\\)\"; python -m pytest sdk/tests backend/tests -q)",
+      "PowerShell(python -m pytest backend/tests/test_persist.py backend/tests/test_failure_loop_demo.py -q)",
+      "PowerShell(python -c \"import json; json.load\\(open\\(r'D:\\\\Argos\\\\deploy\\\\grafana\\\\dashboards\\\\argos-overview.json'\\)\\); print\\('dashboard JSON OK'\\)\")",
+      "PowerShell(docker exec argos-grafana *)",
+      "PowerShell(python D:\\\\Argos\\\\_scan_map.py 2>$null | Select-Object -First 40)"
     ]
   }
 }

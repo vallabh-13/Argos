@@ -16,6 +16,7 @@ and the backend pipeline.
 from .span import Span, StepType, Status
 from .sinks import console_sink, KafkaSink
 from .tracing import init_tracing, trace_step, StepRecorder
+from .protocols import a2a_handoff, mcp_tool_call
 
 __all__ = [
     "init_tracing",
@@ -26,6 +27,8 @@ __all__ = [
     "Status",
     "console_sink",
     "KafkaSink",
+    "a2a_handoff",
+    "mcp_tool_call",
 ]
 
 __version__ = "0.1.0"

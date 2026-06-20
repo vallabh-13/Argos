@@ -1,0 +1,8 @@
+# Demo-only dependencies. These are NOT part of the Argos SDK — they're just what
+# the bundled research-assistant demo needs to talk to AWS Bedrock and read .env.
+#
+#     pip install -r examples/research-assistant/requirements.txt
+#
+# (The Argos SDK itself is installed separately: `pip install -e "sdk[kafka]"`.)
+boto3>=1.34
+python-dotenv>=1.0

@@ -4,13 +4,34 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
   "links": [],
-  "refresh": "5s",
+  "refresh": "10s",
   "schemaVersion": 39,
   "tags": ["argos"],
-  "templating": { "list": [] },
   "time": { "from": "now-15m", "to": "now" },
   "timepicker": {},
   "timezone": "",
+  "templating": {
+    "list": [
+      {
+        "name": "trace_id",
+        "label": "Trace",
+        "type": "query",
+        "datasource": { "type": "grafana-clickhouse-datasource", "uid": "argos-clickhouse" },
+        "refresh": 1,
+        "sort": 0,
+        "includeAll": false,
+        "multi": false,
+        "definition": "SELECT trace_id AS trace FROM argos.trace_nodes GROUP BY trace_id ORDER BY max(written_at) DESC LIMIT 50",
+        "query": {
+          "refId": "A",
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT trace_id AS trace FROM argos.trace_nodes GROUP BY trace_id ORDER BY max(written_at) DESC LIMIT 50"
+        }
+      }
+    ]
+  },
   "title": "Argos — Multi-Agent Trace Overview",
   "uid": "argos-overview",
   "version": 1,
@@ -243,7 +264,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT trace_id, count() AS steps, round(sum(cost_usd), 4) AS cost_usd, countIf(status = 'error') AS errors, max(start_time) AS last_seen FROM argos.spans GROUP BY trace_id ORDER BY last_seen DESC LIMIT 20"
+          "rawSql": "SELECT trace_id AS trace, count() AS steps, round(sum(cost_usd), 4) AS cost_usd, countIf(status = 'error') AS errors, max(start_time) AS last_seen FROM argos.spans GROUP BY trace_id ORDER BY last_seen DESC LIMIT 20"
         }
       ],
       "options": { "showHeader": true },
@@ -314,6 +335,64 @@
                 { "type": "value", "options": { "error": { "color": "red", "index": 0 }, "ok": { "color": "green", "index": 1 } } }
               ] }
             ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "title": "Trace detail — $trace_id",
+      "description": "Every span in the selected trace, indented by depth to show the parent→child tree. Reads the correlation engine's assembled output from argos.trace_nodes.",
+      "type": "table",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 23 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "argos-clickhouse" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "argos-clickhouse" },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT concat(repeat('    ', toUInt32(depth)), name) AS step, agent_name, step_type, round(duration_ms, 1) AS duration_ms, round(cost_usd, 6) AS cost_usd, status, attributes FROM argos.trace_nodes FINAL WHERE trace_id = '$trace_id' ORDER BY order_index"
+        }
+      ],
+      "options": { "showHeader": true, "cellHeight": "sm" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "filterable": false } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "step" },
+            "properties": [
+              { "id": "custom.width", "value": 360 },
+              { "id": "custom.cellOptions", "value": { "type": "auto", "wrapText": false } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "duration_ms" },
+            "properties": [{ "id": "unit", "value": "ms" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "cost_usd" },
+            "properties": [
+              { "id": "unit", "value": "currencyUSD" },
+              { "id": "decimals", "value": 6 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "status" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "type": "color-background" } },
+              {
+                "id": "mappings",
+                "value": [
+                  { "type": "value", "options": { "error": { "color": "red", "index": 0 }, "ok": { "color": "green", "index": 1 } } }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "attributes" },
+            "properties": [{ "id": "custom.width", "value": 520 }]
           }
         ]
       }

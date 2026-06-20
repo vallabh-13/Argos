@@ -57,3 +57,41 @@ PARTITION BY toDate(start_time)
 -- Sort key: optimized for the two queries Argos runs constantly —
 -- "fetch every span in this trace" and "sum cost per run".
 ORDER BY (trace_id, start_time);
+
+
+-- The ASSEMBLED view of a trace (Phase 6 / Part B).
+--
+-- `spans` above is the raw, flat record of what happened. `trace_nodes` is the
+-- correlation engine's *output* materialized for the dashboard: one row per span
+-- but enriched with the engine-computed tree position — `depth` (how deep in the
+-- parent->child tree) and `order_index` (pre-order position, so ORDER BY it
+-- reproduces the tree top-to-bottom). The Grafana "Trace detail" panel reads this
+-- to draw an indented timeline without re-deriving the tree in SQL.
+--
+-- ReplacingMergeTree(written_at): re-persisting the same trace replaces its rows
+-- (dedup is by the sort key (trace_id, span_id), keeping the newest written_at).
+-- Query with FINAL to collapse any not-yet-merged duplicates.
+CREATE TABLE IF NOT EXISTS argos.trace_nodes
+(
+    trace_id        String,
+    span_id         String,
+    parent_span_id  Nullable(String),
+
+    -- engine-computed tree position
+    order_index     UInt32,                   -- pre-order rank; ORDER BY to draw the tree
+    depth           UInt16,                   -- indentation level (root = 0)
+
+    agent_name      LowCardinality(String),
+    step_type       LowCardinality(String),
+    name            String,
+    duration_ms     Float64 DEFAULT 0,
+    cost_usd        Float64 DEFAULT 0,
+    status          LowCardinality(String),
+    error_message   Nullable(String),
+    attributes      String DEFAULT '{}',      -- JSON, same lossless encoding as spans
+    orphaned        UInt8 DEFAULT 0,          -- the engine flagged a missing parent
+
+    written_at      DateTime DEFAULT now()    -- ReplacingMergeTree version column
+)
+ENGINE = ReplacingMergeTree(written_at)
+ORDER BY (trace_id, span_id);

@@ -52,9 +52,11 @@ def _watch(client, config: DetectionConfig, port: int, interval: float) -> None:
     """Serve /metrics and score every newly-seen trace until interrupted."""
 
     from .metrics import init_series, record, serve
+    from ..correlation.persist import ensure_trace_nodes_table, write_trace_nodes
 
     serve(port)
     init_series()  # show a calm green 0 before anything fires
+    ensure_trace_nodes_table(client)  # create the detail table if it's missing
 
     # Treat traces that already exist as "seen", so the demo starts calm and only
     # reacts to traces emitted AFTER the watcher starts.
@@ -72,6 +74,12 @@ def _watch(client, config: DetectionConfig, port: int, interval: float) -> None:
                 if trace is None:
                     continue
                 record(trace, findings)
+                # Materialize the assembled tree for the Grafana detail panel.
+                # Best-effort: a persistence hiccup shouldn't stop the watcher.
+                try:
+                    write_trace_nodes(client, trace)
+                except Exception as exc:  # noqa: BLE001
+                    print(f"  (could not persist trace_nodes for {trace_id}: {exc})")
                 _print_findings(trace_id, findings)
             time.sleep(interval)
     except KeyboardInterrupt:

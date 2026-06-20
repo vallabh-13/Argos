@@ -70,6 +70,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m backend.correlation")
     parser.add_argument("trace_id", help="the trace_id to assemble and print")
     parser.add_argument("--json", action="store_true", help="emit JSON, not a tree")
+    parser.add_argument(
+        "--persist",
+        action="store_true",
+        help="also write the assembled tree to argos.trace_nodes (for the Grafana detail panel)",
+    )
     args = parser.parse_args(argv)
 
     # Import here so `--help` works even without the ClickHouse driver installed.
@@ -86,6 +91,13 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(trace.to_dict(), indent=2, default=str))
     else:
         _print_human(trace)
+
+    if args.persist:
+        from .persist import ensure_trace_nodes_table, write_trace_nodes
+
+        ensure_trace_nodes_table(client)
+        written = write_trace_nodes(client, trace)
+        print(f"\nPersisted {written} node(s) to argos.trace_nodes for trace {trace.trace_id}.")
     return 0
 
 
