@@ -27,12 +27,13 @@ dev = ["pytest>=7.0"]
 # expose storage/ ingest/ ... as separate top-level packages and break the
 # `from backend.storage...` imports the tests and consumers use.
 package-dir = { "backend" = "." }
-# List only packages that exist today. Later phases (correlation, detection) add
-# their own __init__.py and a line here when they grow real code.
+# List only packages that exist today. Later phases (detection) add their own
+# __init__.py and a line here when they grow real code.
 packages = [
     "backend",
     "backend.ingest",
     "backend.storage",
+    "backend.correlation",
 ]
 
 [tool.pytest.ini_options]

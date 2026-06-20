@@ -66,3 +66,5 @@ per-run cost that single-agent tools miss.
 - Phase 0 — Foundations: done.
 - Phase 1 — SDK + a span: done.
 - Phase 2 — ingestion pipeline: done (live round-trip + restart verified).
+- Phase 3 — correlation engine: done (pure stitching engine, per-run rollup,
+  ClickHouse reader, `python -m backend.correlation <trace_id>` CLI; 7 unit tests).

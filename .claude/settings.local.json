@@ -16,7 +16,8 @@
       "Bash(pip install *)",
       "Bash(echo \"exit:$?\")",
       "Bash(unset ARGOS_INTEGRATION)",
-      "Bash(pytest sdk/tests backend/tests)"
+      "Bash(pytest sdk/tests backend/tests)",
+      "Bash(pytest backend/tests/test_correlation.py -v)"
     ]
   }
 }
