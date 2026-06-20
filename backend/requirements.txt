@@ -3,3 +3,4 @@
 
 confluent-kafka>=2.0      # Kafka consumer (reads the argos.spans topic)
 clickhouse-connect>=0.7   # ClickHouse HTTP client (writes the spans table)
+prometheus-client>=0.20   # /metrics endpoint for the detection exporter (Phase 4)

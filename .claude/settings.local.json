@@ -17,7 +17,11 @@
       "Bash(echo \"exit:$?\")",
       "Bash(unset ARGOS_INTEGRATION)",
       "Bash(pytest sdk/tests backend/tests)",
-      "Bash(pytest backend/tests/test_correlation.py -v)"
+      "Bash(pytest backend/tests/test_correlation.py -v)",
+      "Bash(pytest backend/tests/test_detection.py backend/tests/test_detection_metrics.py -v)",
+      "Bash(curl -s http://localhost:9108/metrics)",
+      "Bash(curl -s 'http://localhost:9090/api/v1/targets')",
+      "Bash(curl -s 'http://localhost:9090/api/v1/query?query=argos_findings_total')"
     ]
   }
 }

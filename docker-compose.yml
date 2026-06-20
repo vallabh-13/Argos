@@ -87,8 +87,24 @@ services:
       retries: 10
       start_period: 15s
 
+  # ── Prometheus — scrapes the detection exporter's /metrics ──────────────
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: argos-prometheus
+    ports:
+      - "9090:9090"   # Prometheus UI / query API
+    volumes:
+      # Scrape config (read-only). See the file's header for the host-scrape note.
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    extra_hosts:
+      # Lets the container reach the detection exporter running on the host via
+      # host.docker.internal (needed on Linux; harmless on Docker Desktop).
+      - "host.docker.internal:host-gateway"
+
 # Named volumes = the data that survives restarts. Listed in .gitignore's spirit
 # (Docker manages them outside the repo).
 volumes:
   kafka-data:
   clickhouse-data:
+  prometheus-data:

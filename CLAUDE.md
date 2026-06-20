@@ -67,4 +67,10 @@ per-run cost that single-agent tools miss.
 - Phase 1 — SDK + a span: done.
 - Phase 2 — ingestion pipeline: done (live round-trip + restart verified).
 - Phase 3 — correlation engine: done (pure stitching engine, per-run rollup,
-  ClickHouse reader, `python -m backend.correlation <trace_id>` CLI; 7 unit tests).
+  ClickHouse reader, `python -m backend.correlation <trace_id>` CLI; 7 unit tests
+  + 1 guarded integration test).
+- Phase 4 — detection + alerts: done (loop / tool-failure / cost-spike rules,
+  configurable thresholds, structured findings, Prometheus exporter +
+  prometheus service in docker-compose, `python -m backend.detection <trace_id>
+  [--serve]` CLI; rule + boundary + metrics tests). Verified live: a CRITICAL
+  Finding fired end-to-end and `argos_findings_total` was scraped by Prometheus.

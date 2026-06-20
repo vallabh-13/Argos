@@ -1,0 +1,17 @@
+# Prometheus scrape config for Argos (Phase 4).
+#
+# Prometheus runs in Docker; the detection exporter runs on your HOST (like the
+# Phase 2 consumer), exposing /metrics on :9108. A container can't reach the host
+# via "localhost", so we target `host.docker.internal` — the Docker-provided DNS
+# name for the host machine. On Linux that name is wired up by the
+# `extra_hosts: host.docker.internal:host-gateway` line in docker-compose.yml
+# (Docker Desktop on Windows/Mac provides it automatically).
+
+global:
+  scrape_interval: 10s        # how often Prometheus pulls /metrics
+  evaluation_interval: 10s
+
+scrape_configs:
+  - job_name: argos-detector
+    static_configs:
+      - targets: ["host.docker.internal:9108"]
