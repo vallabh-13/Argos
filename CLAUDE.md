@@ -65,4 +65,4 @@ per-run cost that single-agent tools miss.
 🔧 Update as you go.
 - Phase 0 — Foundations: done.
 - Phase 1 — SDK + a span: done.
-- Phase 2 — ingestion pipeline: built; live round-trip pending verification.
+- Phase 2 — ingestion pipeline: done (live round-trip + restart verified).

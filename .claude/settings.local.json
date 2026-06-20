@@ -4,7 +4,19 @@
       "Bash(mv Docs docs_tmp)",
       "Bash(mv docs_tmp docs)",
       "Bash(python *)",
-      "Bash(docker compose *)"
+      "Bash(docker compose *)",
+      "Bash(pytest backend/tests --collect-only -q)",
+      "Bash(pip list *)",
+      "Bash(pytest sdk/tests backend/tests -v)",
+      "Bash(pytest sdk/tests backend/tests --co -q)",
+      "Bash(pytest backend/tests --co -q)",
+      "Bash(pytest sdk/tests backend/tests --co)",
+      "Bash(pytest backend/tests --co)",
+      "Bash(pytest sdk/tests --co)",
+      "Bash(pip install *)",
+      "Bash(echo \"exit:$?\")",
+      "Bash(unset ARGOS_INTEGRATION)",
+      "Bash(pytest sdk/tests backend/tests)"
     ]
   }
 }

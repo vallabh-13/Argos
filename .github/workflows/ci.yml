@@ -26,10 +26,14 @@ jobs:
           python-version: "3.12"
 
       - name: Install the SDK, backend, and test dependencies
+        # Both packages are installed editable (-e) so `import argos` and
+        # `import backend...` resolve from anywhere — independent of pytest's
+        # rootdir. The backend was previously only getting its *dependencies*
+        # (requirements.txt), never the package itself, so collection failed.
         run: |
           python -m pip install --upgrade pip
           pip install -e "sdk[dev,kafka]"
-          pip install -r backend/requirements.txt
+          pip install -e "backend[dev]"
 
       - name: Run pytest
         # Unit tests only; the integration test is skipped unless

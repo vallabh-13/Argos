@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "argos-backend"
+version = "0.1.0"
+description = "Argos backend: Kafka ingest + ClickHouse storage for the tracing pipeline"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Vallabh Mahadik" }]
+
+# Runtime dependencies (kept in sync with requirements.txt, which stays as a
+# convenience for `pip install -r`). Installing the package pulls these in.
+dependencies = [
+    "confluent-kafka>=2.0",      # Kafka consumer (reads the argos.spans topic)
+    "clickhouse-connect>=0.7",   # ClickHouse HTTP client (writes the spans table)
+]
+
+[project.optional-dependencies]
+# Installed in CI and for local development: `pip install -e "backend[dev]"`
+dev = ["pytest>=7.0"]
+
+[tool.setuptools]
+# The importable package is `backend` and it lives in THIS directory, so map the
+# `backend` package name to ".". Without this, flat-layout auto-discovery would
+# expose storage/ ingest/ ... as separate top-level packages and break the
+# `from backend.storage...` imports the tests and consumers use.
+package-dir = { "backend" = "." }
+# List only packages that exist today. Later phases (correlation, detection) add
+# their own __init__.py and a line here when they grow real code.
+packages = [
+    "backend",
+    "backend.ingest",
+    "backend.storage",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
