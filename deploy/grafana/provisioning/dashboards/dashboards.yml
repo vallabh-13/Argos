@@ -1,0 +1,16 @@
+# Dashboard provider, provisioned as code.
+#
+# Tells Grafana: "load every dashboard JSON found in the mounted folder." That
+# folder (./deploy/grafana/dashboards) is mounted to the path below in
+# docker-compose.yml, so argos-overview.json shows up automatically at startup.
+
+apiVersion: 1
+
+providers:
+  - name: Argos
+    type: file
+    # Let edits in the UI be saved back, but the file on disk is the source.
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

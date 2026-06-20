@@ -1,0 +1,36 @@
+# Grafana datasources, provisioned as code.
+#
+# Grafana reads this at startup and creates both datasources automatically — no
+# clicking in the UI. The fixed `uid`s matter: the dashboard JSON references
+# datasources by uid, so pinning them here keeps the dashboard wired correctly
+# on every fresh `docker compose up`.
+
+apiVersion: 1
+
+datasources:
+  # Metrics from the detection exporter (cost, findings, gauges).
+  - name: Prometheus
+    uid: argos-prometheus
+    type: prometheus
+    access: proxy
+    # `prometheus` is the service name on the compose network; Grafana (also a
+    # container) reaches it there, not on localhost.
+    url: http://prometheus:9090
+    isDefault: true
+
+  # Real trace/span data straight from the storage table.
+  - name: ClickHouse
+    uid: argos-clickhouse
+    # Provided by the grafana-clickhouse-datasource plugin (installed via
+    # GF_INSTALL_PLUGINS in docker-compose.yml).
+    type: grafana-clickhouse-datasource
+    access: proxy
+    jsonData:
+      host: clickhouse          # service name on the compose network
+      port: 9000                # ClickHouse native protocol port
+      protocol: native
+      secure: false
+      username: argos
+      defaultDatabase: argos
+    secureJsonData:
+      password: argos

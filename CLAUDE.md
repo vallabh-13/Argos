@@ -74,3 +74,7 @@ per-run cost that single-agent tools miss.
   prometheus service in docker-compose, `python -m backend.detection <trace_id>
   [--serve]` CLI; rule + boundary + metrics tests). Verified live: a CRITICAL
   Finding fired end-to-end and `argos_findings_total` was scraped by Prometheus.
+- Phase 5 — Grafana dashboard: done (grafana service auto-provisioned via
+  deploy/grafana/; Prometheus + ClickHouse datasources; stat/gauge/timeseries/
+  table panels that go red on findings; `--watch` detector mode so emitting a bad
+  trace lights the dashboard unaided; recording guide in docs/demo.md).

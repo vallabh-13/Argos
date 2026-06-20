@@ -21,7 +21,11 @@
       "Bash(pytest backend/tests/test_detection.py backend/tests/test_detection_metrics.py -v)",
       "Bash(curl -s http://localhost:9108/metrics)",
       "Bash(curl -s 'http://localhost:9090/api/v1/targets')",
-      "Bash(curl -s 'http://localhost:9090/api/v1/query?query=argos_findings_total')"
+      "Bash(curl -s 'http://localhost:9090/api/v1/query?query=argos_findings_total')",
+      "Bash(grep -nE '^\\\\s{2}[a-z].*:$|services:|^volumes:' docker-compose.yml)",
+      "Bash(curl -s \"http://localhost:3000/api/search?query=Argos\")",
+      "Bash(curl -s \"http://localhost:3000/api/datasources/uid/argos-prometheus/health\")",
+      "Bash(curl -s \"http://localhost:3000/api/datasources/uid/argos-clickhouse/health\")"
     ]
   }
 }

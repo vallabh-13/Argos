@@ -75,6 +75,21 @@ def record(trace: "AssembledTrace", findings: "list[Finding]") -> None:
     LAST_RUN_TOOL_FAILURES.set(max(fails) if fails else 0)
 
 
+def init_series() -> None:
+    """Pre-create the findings series at 0 so the dashboard reads a green "0".
+
+    A labelled Counter emits no time series until a label combination is first
+    used, which would make the panels show "No data" instead of a calm 0 before
+    any finding fires. Touching each (rule, severity) here creates the 0-valued
+    series up front.
+    """
+
+    rules = ("runaway_loop", "repeated_tool_failure", "cost_spike")
+    for rule in rules:
+        for severity in ("warning", "critical"):
+            FINDINGS.labels(rule=rule, severity=severity)
+
+
 def serve(port: int = 9108) -> None:
     """Start the /metrics HTTP endpoint Prometheus scrapes (non-blocking).
 

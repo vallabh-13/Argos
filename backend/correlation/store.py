@@ -40,3 +40,20 @@ def fetch_spans(client, trace_id: str) -> list[dict[str, Any]]:
         spans.append(span)
 
     return spans
+
+
+def recent_trace_ids(client, limit: int = 50) -> list[str]:
+    """Return recent trace_ids, **oldest-first**.
+
+    Used by the detector's --watch mode to discover traces to evaluate. Ordering
+    oldest-first means that when several new traces show up in one poll, the most
+    recent one is evaluated last — so the "last run" gauges end up reflecting it.
+    """
+
+    result = client.query(
+        "SELECT trace_id FROM argos.spans "
+        "GROUP BY trace_id ORDER BY max(start_time) DESC LIMIT {lim:UInt32}",
+        parameters={"lim": limit},
+    )
+    # Query is newest-first for the LIMIT; reverse to hand back oldest-first.
+    return [row[0] for row in reversed(result.result_rows)]
