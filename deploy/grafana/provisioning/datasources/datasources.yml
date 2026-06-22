@@ -30,7 +30,7 @@ datasources:
       port: 9000                # ClickHouse native protocol port
       protocol: native
       secure: false
-      username: argos
-      defaultDatabase: argos
+      username: ${CLICKHOUSE_USER}
+      defaultDatabase: ${CLICKHOUSE_DB}
     secureJsonData:
-      password: argos
+      password: ${CLICKHOUSE_PASSWORD}

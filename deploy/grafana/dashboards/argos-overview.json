@@ -34,7 +34,7 @@
   },
   "title": "Argos — Multi-Agent Trace Overview",
   "uid": "argos-overview",
-  "version": 4,
+  "version": 12,
   "panels": [
     {
       "id": 1,
@@ -411,6 +411,53 @@
           {
             "matcher": { "id": "byName", "options": "attributes" },
             "properties": [{ "id": "custom.width", "value": 520 }]
+          }
+        ]
+      }
+    },
+    {
+      "id": 10,
+      "title": "Trace timeline — $trace_id",
+      "description": "Horizontal timeline of the selected trace: every step is a dot, left-to-right in the order it happened (evenly spaced by sequence so the rapid retry loop doesn't pile up). Green = ok, red = error — the failed steps stand out immediately. A dot's height is how long that step took (log scale), so slow steps sit high and instant ones sit low. Hover a dot for its duration and time; the full per-step detail (agent, cost, error) is in the Trace detail table above, aligned in the same order. Reads argos.trace_nodes.",
+      "type": "timeseries",
+      "gridPos": { "h": 11, "w": 24, "x": 0, "y": 35 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "argos-clickhouse" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "argos-clickhouse" },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT toDateTime(1704067200 + seq) AS time, if(status = 'ok', dur, NULL) AS `ok`, if(status = 'error', dur, NULL) AS `error` FROM (SELECT order_index AS seq, round(duration_ms, 2) AS dur, status FROM argos.trace_nodes WHERE trace_id IN (SELECT trace_id FROM argos.spans GROUP BY trace_id, service_name HAVING concat(service_name, ' · ', if(countIf(status = 'error') > 0, 'fail', 'ok'), ' · ', formatDateTime(max(start_time), '%H:%i:%S')) = '$trace_id') ORDER BY written_at DESC LIMIT 1 BY span_id) ORDER BY seq"
+        }
+      ],
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom", "calcs": [] },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0.05,
+          "custom": {
+            "drawStyle": "points",
+            "showPoints": "always",
+            "pointSize": 16,
+            "lineWidth": 0,
+            "fillOpacity": 0,
+            "axisLabel": "duration (ms, log)",
+            "scaleDistribution": { "type": "log", "log": 10 }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "ok" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "error" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }]
           }
         ]
       }

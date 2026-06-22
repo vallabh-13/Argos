@@ -117,6 +117,10 @@ services:
       GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
       # Land straight on the Argos dashboard.
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: "/var/lib/grafana/dashboards/argos-overview.json"
+      # Pass the ClickHouse credentials so they match what the clickhouse service uses.
+      CLICKHOUSE_DB: "${CLICKHOUSE_DB:-argos}"
+      CLICKHOUSE_USER: "${CLICKHOUSE_USER:-argos}"
+      CLICKHOUSE_PASSWORD: "${CLICKHOUSE_PASSWORD:-argos}"
     volumes:
       # Provisioning = datasources + dashboard provider, applied at startup.
       - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
