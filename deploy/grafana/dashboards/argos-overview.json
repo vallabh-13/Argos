@@ -21,20 +21,20 @@
         "sort": 0,
         "includeAll": false,
         "multi": false,
-        "definition": "SELECT concat(service_name, ' · ', if(countIf(status = 'error') > 0, 'fail', 'ok'), ' · ', formatDateTime(max(start_time), '%H:%M')) AS __text, trace_id AS __value FROM argos.spans GROUP BY trace_id, service_name ORDER BY max(start_time) DESC LIMIT 50",
+        "definition": "SELECT concat(service_name, ' · ', if(countIf(status = 'error') > 0, 'fail', 'ok'), ' · ', formatDateTime(max(start_time), '%H:%i:%S')) AS trace FROM argos.spans WHERE trace_id IN (SELECT trace_id FROM argos.trace_nodes) GROUP BY trace_id, service_name ORDER BY max(start_time) DESC LIMIT 50",
         "query": {
           "refId": "A",
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT concat(service_name, ' · ', if(countIf(status = 'error') > 0, 'fail', 'ok'), ' · ', formatDateTime(max(start_time), '%H:%M')) AS __text, trace_id AS __value FROM argos.spans GROUP BY trace_id, service_name ORDER BY max(start_time) DESC LIMIT 50"
+          "rawSql": "SELECT concat(service_name, ' · ', if(countIf(status = 'error') > 0, 'fail', 'ok'), ' · ', formatDateTime(max(start_time), '%H:%i:%S')) AS trace FROM argos.spans WHERE trace_id IN (SELECT trace_id FROM argos.trace_nodes) GROUP BY trace_id, service_name ORDER BY max(start_time) DESC LIMIT 50"
         }
       }
     ]
   },
   "title": "Argos — Multi-Agent Trace Overview",
   "uid": "argos-overview",
-  "version": 3,
+  "version": 4,
   "panels": [
     {
       "id": 1,
@@ -264,7 +264,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT concat(service_name, ' · ', if(countIf(status = 'error') > 0, 'fail', 'ok'), ' · ', formatDateTime(max(start_time), '%H:%M')) AS run, count() AS steps, round(sum(cost_usd), 4) AS cost_usd, countIf(status = 'error') AS errors, max(start_time) AS last_seen FROM argos.spans GROUP BY trace_id, service_name ORDER BY last_seen DESC LIMIT 30"
+          "rawSql": "SELECT concat(service_name, ' · ', if(countIf(status = 'error') > 0, 'fail', 'ok'), ' · ', formatDateTime(max(start_time), '%H:%i:%S')) AS run, count() AS steps, round(sum(cost_usd), 4) AS cost_usd, countIf(status = 'error') AS errors, max(start_time) AS last_seen FROM argos.spans GROUP BY trace_id, service_name ORDER BY last_seen DESC LIMIT 30"
         }
       ],
       "options": { "showHeader": true, "sortBy": [{ "displayName": "last_seen", "desc": true }] },
@@ -352,7 +352,7 @@
     },
     {
       "id": 9,
-      "title": "Trace detail — ${trace_id:text}",
+      "title": "Trace detail — $trace_id",
       "description": "Every span in the selected trace, indented by depth to show the parent→child tree. Reads the correlation engine's assembled output from argos.trace_nodes.",
       "type": "table",
       "gridPos": { "h": 12, "w": 24, "x": 0, "y": 23 },
@@ -364,7 +364,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT step, agent_name, step_type, detail, duration_ms, cost_usd, status, attributes FROM (SELECT concat(repeat('    ', toUInt32(depth)), name) AS step, agent_name, step_type, multiIf(step_type = 'a2a_handoff', concat(JSONExtractString(attributes, 'a2a.from'), ' → ', JSONExtractString(attributes, 'a2a.to')), step_type = 'tool_call', concat(JSONExtractString(attributes, 'mcp.server'), '.', JSONExtractString(attributes, 'mcp.tool')), '') AS detail, round(duration_ms, 1) AS duration_ms, round(cost_usd, 6) AS cost_usd, status, attributes, order_index FROM argos.trace_nodes WHERE trace_id = '$trace_id' ORDER BY written_at DESC LIMIT 1 BY span_id) ORDER BY order_index"
+          "rawSql": "SELECT step, agent_name, step_type, detail, duration_ms, cost_usd, status, attributes FROM (SELECT concat(repeat('    ', toUInt32(depth)), name) AS step, agent_name, step_type, multiIf(step_type = 'a2a_handoff', concat(JSONExtractString(attributes, 'a2a.from'), ' → ', JSONExtractString(attributes, 'a2a.to')), step_type = 'tool_call', concat(JSONExtractString(attributes, 'mcp.server'), '.', JSONExtractString(attributes, 'mcp.tool')), '') AS detail, round(duration_ms, 1) AS duration_ms, round(cost_usd, 6) AS cost_usd, status, attributes, order_index FROM argos.trace_nodes WHERE trace_id IN (SELECT trace_id FROM argos.spans GROUP BY trace_id, service_name HAVING concat(service_name, ' · ', if(countIf(status = 'error') > 0, 'fail', 'ok'), ' · ', formatDateTime(max(start_time), '%H:%i:%S')) = '$trace_id') ORDER BY written_at DESC LIMIT 1 BY span_id) ORDER BY order_index"
         }
       ],
       "options": { "showHeader": true, "cellHeight": "sm" },
