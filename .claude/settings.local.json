@@ -35,7 +35,21 @@
       "PowerShell(python -m pytest backend/tests/test_persist.py backend/tests/test_failure_loop_demo.py -q)",
       "PowerShell(python -c \"import json; json.load\\(open\\(r'D:\\\\Argos\\\\deploy\\\\grafana\\\\dashboards\\\\argos-overview.json'\\)\\); print\\('dashboard JSON OK'\\)\")",
       "PowerShell(docker exec argos-grafana *)",
-      "PowerShell(python D:\\\\Argos\\\\_scan_map.py 2>$null | Select-Object -First 40)"
+      "PowerShell(python D:\\\\Argos\\\\_scan_map.py 2>$null | Select-Object -First 40)",
+      "Bash(awk -F= '/^AWS_ACCESS_KEY_ID=/{print \"AWS_ACCESS_KEY_ID length:\", length\\($2\\)}' examples/research-assistant/.env)",
+      "Bash(ARGOS_BEDROCK_MOCK=1 python examples/research-assistant/run_demo.py --scenario fail --sink console)",
+      "Bash(docker version *)",
+      "Bash(docker exec *)",
+      "Bash(curl -s -o /dev/null -w \"search dashboards: %{http_code}\\\\n\" http://localhost:3000/api/search?type=dash-db)",
+      "Bash(curl -s -o /dev/null -w \"/api/org: %{http_code}\\\\n\" http://localhost:3000/api/org)",
+      "Bash(curl -s -o /dev/null -w \"/api/datasources: %{http_code}\\\\n\" http://localhost:3000/api/datasources)",
+      "PowerShell($dd = \"C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe\"; if \\(Test-Path $dd\\) { Start-Process $dd; \"starting Docker Desktop\" } else { \"Docker Desktop not found at $dd\" })",
+      "PowerShell(docker info *)",
+      "PowerShell(git add *)",
+      "PowerShell(docker compose up *)",
+      "Read(//c/Users/Vallabh/AppData/Local/Temp/**)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
