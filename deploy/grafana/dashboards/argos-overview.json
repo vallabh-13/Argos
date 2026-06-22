@@ -34,7 +34,7 @@
   },
   "title": "Argos — Multi-Agent Trace Overview",
   "uid": "argos-overview",
-  "version": 1,
+  "version": 2,
   "panels": [
     {
       "id": 1,
@@ -353,7 +353,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT concat(repeat('    ', toUInt32(depth)), name) AS step, agent_name, step_type, round(duration_ms, 1) AS duration_ms, round(cost_usd, 6) AS cost_usd, status, attributes FROM argos.trace_nodes FINAL WHERE trace_id = '$trace_id' ORDER BY order_index"
+          "rawSql": "SELECT step, agent_name, step_type, duration_ms, cost_usd, status, attributes FROM (SELECT concat(repeat('    ', toUInt32(depth)), name) AS step, agent_name, step_type, round(duration_ms, 1) AS duration_ms, round(cost_usd, 6) AS cost_usd, status, attributes, order_index FROM argos.trace_nodes WHERE trace_id = '$trace_id' ORDER BY written_at DESC LIMIT 1 BY span_id) ORDER BY order_index"
         }
       ],
       "options": { "showHeader": true, "cellHeight": "sm" },
