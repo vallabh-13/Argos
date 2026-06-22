@@ -58,21 +58,39 @@ def _watch(client, config: DetectionConfig, port: int, interval: float) -> None:
     init_series()  # show a calm green 0 before anything fires
     ensure_trace_nodes_table(client)  # create the detail table if it's missing
 
-    # Treat traces that already exist as "seen", so the demo starts calm and only
-    # reacts to traces emitted AFTER the watcher starts.
-    seen: set[str] = set(recent_trace_ids(client, limit=500))
+    # Treat traces that already exist as already-scored, so the demo starts calm
+    # and only reacts to traces emitted AFTER the watcher starts.
+    scored: set[str] = set(recent_trace_ids(client, limit=500))
+    # A new trace's spans don't all land at once: they stream in through
+    # Kafka -> consumer -> ClickHouse over several seconds, and the root span is
+    # emitted LAST. If we scored a trace the instant we first saw it, we'd often
+    # evaluate a half-written trace (its failing tool_calls not in yet), find
+    # nothing, and — because Prometheus counters can't be un-incremented — never
+    # look again. So we wait for the span count to stop growing before scoring,
+    # which is what makes a fail run reliably light up the findings.
+    pending: dict[str, int] = {}
     print(f"Watching for new traces — serving metrics on :{port}/metrics.")
-    print(f"({len(seen)} existing trace(s) ignored; Ctrl-C to stop.)")
+    print(f"({len(scored)} existing trace(s) ignored; Ctrl-C to stop.)")
 
     try:
         while True:
             for trace_id in recent_trace_ids(client, limit=50):
-                if trace_id in seen:
+                if trace_id in scored:
                     continue
-                seen.add(trace_id)
-                trace, findings = _evaluate(client, trace_id, config)
-                if trace is None:
+                spans = fetch_spans(client, trace_id)
+                count = len(spans)
+                if count == 0:
                     continue
+                # Only score once the trace has settled: the span count must be
+                # the same as the previous poll. A growing count means spans are
+                # still arriving, so remember it and check again next time.
+                if pending.get(trace_id) != count:
+                    pending[trace_id] = count
+                    continue
+                pending.pop(trace_id, None)
+                scored.add(trace_id)
+                trace = build_trace(spans, trace_id)
+                findings = run_detection(trace, config)
                 record(trace, findings)
                 # Materialize the assembled tree for the Grafana detail panel.
                 # Best-effort: a persistence hiccup shouldn't stop the watcher.
