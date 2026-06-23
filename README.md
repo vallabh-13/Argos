@@ -301,6 +301,7 @@ docker compose up
 # 3. In another terminal, run the bundled multi-agent example
 cd examples/research-assistant
 pip install -r requirements.txt
+aws configure        # once — Bedrock creds via the standard AWS credential chain
 python run_demo.py
 
 # 4. Open the dashboard — a trace should already be visible

@@ -5,9 +5,10 @@ returning an :class:`LLMResult`):
 
 * :class:`BedrockLLM` — calls the real Bedrock **Converse** API via boto3. Model
   id and region come from the environment (``ARGOS_BEDROCK_MODEL`` / ``AWS_REGION``),
-  loaded from ``.env`` — never hardcoded. Credentials are read by boto3 from the
-  same environment. It also handles the "this model needs an inference profile"
-  Bedrock quirk gracefully (see :meth:`BedrockLLM.converse`).
+  loaded from ``.env`` — never hardcoded. Credentials are NOT in ``.env``: boto3
+  resolves them from the standard AWS credential chain (``aws configure`` locally,
+  or an attached IAM role in EKS/EC2). It also handles the "this model needs an
+  inference profile" Bedrock quirk gracefully (see :meth:`BedrockLLM.converse`).
 
 * :class:`MockLLM` — returns canned, deterministic text with **no AWS call**.
   Enabled with ``ARGOS_BEDROCK_MOCK=1``. Lets you exercise the whole pipeline /

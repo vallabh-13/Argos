@@ -10,7 +10,8 @@ Setup (once):
     pip install -e "sdk[kafka]"
     pip install -r examples/research-assistant/requirements.txt
     cp examples/research-assistant/.env.example examples/research-assistant/.env
-    # edit .env: AWS creds + model, OR set ARGOS_BEDROCK_MOCK=1 to skip AWS
+    aws configure   # once — boto3 reads creds from the AWS credential chain
+    # edit .env: set the model, OR set ARGOS_BEDROCK_MOCK=1 to skip AWS entirely
 
 Run to the console (no pipeline needed):
     python examples/research-assistant/run_demo.py --scenario happy

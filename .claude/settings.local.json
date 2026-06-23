@@ -52,7 +52,8 @@
       "Bash(git commit -m ' *)",
       "PowerShell(Out-Null *)",
       "PowerShell(docker exec argos-clickhouse *)",
-      "PowerShell($env:NO_PROXY=\"localhost,127.0.0.1\"; try { $r = Invoke-RestMethod -Uri \"http://admin:admin@localhost:3000/api/dashboards/uid/argos-overview\" -ErrorAction Stop; $r.dashboard.templating.list | ConvertTo-Json -Depth 6 } catch { \"ERR: $\\($_.Exception.Message\\)\" })"
+      "PowerShell($env:NO_PROXY=\"localhost,127.0.0.1\"; try { $r = Invoke-RestMethod -Uri \"http://admin:admin@localhost:3000/api/dashboards/uid/argos-overview\" -ErrorAction Stop; $r.dashboard.templating.list | ConvertTo-Json -Depth 6 } catch { \"ERR: $\\($_.Exception.Message\\)\" })",
+      "Bash(git check-ignore *)"
     ]
   }
 }
