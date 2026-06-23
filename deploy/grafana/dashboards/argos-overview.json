@@ -9,7 +9,7 @@
   "tags": ["argos"],
   "time": { "from": "now-15m", "to": "now" },
   "timepicker": {},
-  "timezone": "",
+  "timezone": "browser",
   "templating": {
     "list": [
       {
@@ -21,20 +21,20 @@
         "sort": 0,
         "includeAll": false,
         "multi": false,
-        "definition": "SELECT concat(service_name, ' · ', if(countIf(status = 'error') > 0, 'fail', 'ok'), ' · ', formatDateTime(max(start_time), '%H:%i:%S')) AS trace FROM argos.spans WHERE trace_id IN (SELECT trace_id FROM argos.trace_nodes) GROUP BY trace_id, service_name ORDER BY max(start_time) DESC LIMIT 50",
+        "definition": "SELECT concat(service_name, ' · ', if(countIf(status = 'error') > 0, 'fail', 'ok'), ' · ', formatDateTime(max(start_time), '%H:%i:%S', 'America/New_York')) AS trace FROM argos.spans WHERE trace_id IN (SELECT trace_id FROM argos.trace_nodes) GROUP BY trace_id, service_name ORDER BY max(start_time) DESC LIMIT 50",
         "query": {
           "refId": "A",
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT concat(service_name, ' · ', if(countIf(status = 'error') > 0, 'fail', 'ok'), ' · ', formatDateTime(max(start_time), '%H:%i:%S')) AS trace FROM argos.spans WHERE trace_id IN (SELECT trace_id FROM argos.trace_nodes) GROUP BY trace_id, service_name ORDER BY max(start_time) DESC LIMIT 50"
+          "rawSql": "SELECT concat(service_name, ' · ', if(countIf(status = 'error') > 0, 'fail', 'ok'), ' · ', formatDateTime(max(start_time), '%H:%i:%S', 'America/New_York')) AS trace FROM argos.spans WHERE trace_id IN (SELECT trace_id FROM argos.trace_nodes) GROUP BY trace_id, service_name ORDER BY max(start_time) DESC LIMIT 50"
         }
       }
     ]
   },
   "title": "Argos — Multi-Agent Trace Overview",
   "uid": "argos-overview",
-  "version": 12,
+  "version": 17,
   "panels": [
     {
       "id": 1,
@@ -264,7 +264,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT concat(service_name, ' · ', if(countIf(status = 'error') > 0, 'fail', 'ok'), ' · ', formatDateTime(max(start_time), '%H:%i:%S')) AS run, count() AS steps, round(sum(cost_usd), 4) AS cost_usd, countIf(status = 'error') AS errors, max(start_time) AS last_seen FROM argos.spans GROUP BY trace_id, service_name ORDER BY last_seen DESC LIMIT 30"
+          "rawSql": "SELECT concat(service_name, ' · ', if(countIf(status = 'error') > 0, 'fail', 'ok'), ' · ', formatDateTime(max(start_time), '%H:%i:%S', 'America/New_York')) AS run, count() AS steps, round(sum(cost_usd), 4) AS cost_usd, countIf(status = 'error') AS errors, max(start_time) AS last_seen FROM argos.spans GROUP BY trace_id, service_name ORDER BY last_seen DESC LIMIT 30"
         }
       ],
       "options": { "showHeader": true, "sortBy": [{ "displayName": "last_seen", "desc": true }] },
@@ -364,7 +364,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT step, agent_name, step_type, detail, duration_ms, cost_usd, status, attributes FROM (SELECT concat(repeat('    ', toUInt32(depth)), name) AS step, agent_name, step_type, multiIf(step_type = 'a2a_handoff', concat(JSONExtractString(attributes, 'a2a.from'), ' → ', JSONExtractString(attributes, 'a2a.to')), step_type = 'tool_call', concat(JSONExtractString(attributes, 'mcp.server'), '.', JSONExtractString(attributes, 'mcp.tool')), '') AS detail, round(duration_ms, 1) AS duration_ms, round(cost_usd, 6) AS cost_usd, status, attributes, order_index FROM argos.trace_nodes WHERE trace_id IN (SELECT trace_id FROM argos.spans GROUP BY trace_id, service_name HAVING concat(service_name, ' · ', if(countIf(status = 'error') > 0, 'fail', 'ok'), ' · ', formatDateTime(max(start_time), '%H:%i:%S')) = '$trace_id') ORDER BY written_at DESC LIMIT 1 BY span_id) ORDER BY order_index"
+          "rawSql": "SELECT step, agent_name, step_type, detail, duration_ms, cost_usd, status, attributes FROM (SELECT concat(repeat('    ', toUInt32(depth)), name) AS step, agent_name, step_type, multiIf(step_type = 'a2a_handoff', concat(JSONExtractString(attributes, 'a2a.from'), ' → ', JSONExtractString(attributes, 'a2a.to')), step_type = 'tool_call', concat(JSONExtractString(attributes, 'mcp.server'), '.', JSONExtractString(attributes, 'mcp.tool')), '') AS detail, round(duration_ms, 1) AS duration_ms, round(cost_usd, 6) AS cost_usd, status, attributes, order_index FROM argos.trace_nodes WHERE trace_id IN (SELECT trace_id FROM argos.spans GROUP BY trace_id, service_name HAVING concat(service_name, ' · ', if(countIf(status = 'error') > 0, 'fail', 'ok'), ' · ', formatDateTime(max(start_time), '%H:%i:%S', 'America/New_York')) = '$trace_id') ORDER BY written_at DESC LIMIT 1 BY span_id) ORDER BY order_index"
         }
       ],
       "options": { "showHeader": true, "cellHeight": "sm" },
@@ -418,7 +418,7 @@
     {
       "id": 10,
       "title": "Trace timeline — $trace_id",
-      "description": "Horizontal timeline of the selected trace: every step is a dot, left-to-right in the order it happened (evenly spaced by sequence so the rapid retry loop doesn't pile up). Green = ok, red = error — the failed steps stand out immediately. A dot's height is how long that step took (log scale), so slow steps sit high and instant ones sit low. Hover a dot for its duration and time; the full per-step detail (agent, cost, error) is in the Trace detail table above, aligned in the same order. Reads argos.trace_nodes.",
+      "description": "Horizontal timeline of the selected trace: every step is a dot at its real wall-clock start time (your local timezone). Green = ok, red = error — the failed steps stand out immediately. A dot's height is how long that step took (log scale), so slow steps sit high and instant ones sit low. Hover a dot for its duration and time; the full per-step detail (agent, cost, error) is in the Trace detail table above. Reads argos.spans.",
       "type": "timeseries",
       "gridPos": { "h": 11, "w": 24, "x": 0, "y": 35 },
       "datasource": { "type": "grafana-clickhouse-datasource", "uid": "argos-clickhouse" },
@@ -429,7 +429,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT toDateTime(1704067200 + seq) AS time, if(status = 'ok', dur, NULL) AS `ok`, if(status = 'error', dur, NULL) AS `error` FROM (SELECT order_index AS seq, round(duration_ms, 2) AS dur, status FROM argos.trace_nodes WHERE trace_id IN (SELECT trace_id FROM argos.spans GROUP BY trace_id, service_name HAVING concat(service_name, ' · ', if(countIf(status = 'error') > 0, 'fail', 'ok'), ' · ', formatDateTime(max(start_time), '%H:%i:%S')) = '$trace_id') ORDER BY written_at DESC LIMIT 1 BY span_id) ORDER BY seq"
+          "rawSql": "SELECT start_time AS time, if(status = 'ok', round(duration_ms, 2), NULL) AS `ok`, if(status = 'error', round(duration_ms, 2), NULL) AS `error` FROM argos.spans WHERE trace_id IN (SELECT trace_id FROM argos.spans GROUP BY trace_id, service_name HAVING concat(service_name, ' · ', if(countIf(status = 'error') > 0, 'fail', 'ok'), ' · ', formatDateTime(max(start_time), '%H:%i:%S', 'America/New_York')) = '$trace_id') ORDER BY start_time"
         }
       ],
       "options": {
@@ -460,6 +460,31 @@
             "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }]
           }
         ]
+      }
+    },
+    {
+      "id": 11,
+      "title": "Trace sequence — $trace_id",
+      "description": "Left-to-right boxes-and-arrows flow of the selected trace, in execution order (argos.trace_nodes, order_index). Each box shows step number + type, agent, step name, duration and a ✓/✗; green = ok, red = error, so a failure shows up as a clear run of red boxes. Hover any box for full detail (agent, step, type, duration, cost, status, error). Rendered as styled HTML generated from the trace. Companion to the Trace detail table.",
+      "type": "marcusolsson-dynamictext-panel",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 46 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "argos-clickhouse" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "argos-clickhouse" },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT concat('<div style=', char(34), 'display:flex;flex-wrap:wrap;align-items:stretch;gap:10px;font-family:sans-serif;padding:12px', char(34), '>', arrayStringConcat(arrayMap((i, ag, stp, typ, dur, cost, st, err) -> concat('<div title=', char(34), 'Agent: ', ag, '&#10;Step: ', stp, '&#10;Type: ', typ, '&#10;Duration: ', dur, ' ms&#10;Cost: $', cost, '&#10;Status: ', if(st = 'err', 'ERROR', 'ok'), if(st = 'err' AND err != '', concat('&#10;Error: ', err), ''), char(34), ' style=', char(34), 'background:', if(st = 'err', '#b71c1c', '#1b5e20'), ';color:#fff;border-radius:8px;padding:8px 12px;min-width:108px;max-width:180px;text-align:center;cursor:help', char(34), '>', '<div style=', char(34), 'font-size:10px;opacity:.7', char(34), '>', toString(i), '. ', typ, '</div>', '<div style=', char(34), 'font-weight:700;font-size:13px', char(34), '>', ag, '</div>', '<div style=', char(34), 'font-size:11px;opacity:.9;word-break:break-word', char(34), '>', stp, '</div>', '<div style=', char(34), 'font-size:11px;margin-top:3px', char(34), '>', dur, ' ms ', if(st = 'err', '✗', '✓'), '</div>', '</div>'), arrayEnumerate(ags), ags, stps, typs, durs, costs, sts, errs), concat('<span style=', char(34), 'align-self:center;color:#9aa6b2;font-size:20px', char(34), '>&#8594;</span>')), '</div>') AS html FROM (SELECT groupArray(ag) ags, groupArray(stp) stps, groupArray(typ) typs, groupArray(dur) durs, groupArray(cost) costs, groupArray(st) sts, groupArray(err) errs FROM (SELECT agent_name ag, replaceAll(name, '->', '→') stp, step_type typ, toString(round(duration_ms, 1)) dur, toString(round(cost_usd, 6)) cost, if(status = 'error', 'err', 'ok') st, replaceAll(replaceAll(ifNull(error_message, ''), char(34), char(39)), char(10), ' ') err, order_index FROM (SELECT agent_name, name, step_type, duration_ms, cost_usd, status, error_message, order_index FROM argos.trace_nodes WHERE trace_id IN (SELECT trace_id FROM argos.spans GROUP BY trace_id, service_name HAVING concat(service_name, ' · ', if(countIf(status = 'error') > 0, 'fail', 'ok'), ' · ', formatDateTime(max(start_time), '%H:%i:%S', 'America/New_York')) = '$trace_id') ORDER BY written_at DESC LIMIT 1 BY span_id) ORDER BY order_index))"
+        }
+      ],
+      "options": {
+        "content": "{{{html}}}",
+        "defaultContent": "No trace selected — pick one from the Trace dropdown above.",
+        "renderMode": "everyRow",
+        "disableSanitize": true,
+        "wrap": true
       }
     }
   ]

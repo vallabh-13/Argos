@@ -109,9 +109,10 @@ services:
     ports:
       - "3000:3000"   # http://localhost:3000 — the dashboard
     environment:
-      # ClickHouse isn't a built-in datasource; Grafana downloads this official
-      # plugin on first boot (needs internet that one time).
-      GF_INSTALL_PLUGINS: "grafana-clickhouse-datasource"
+      # ClickHouse isn't a built-in datasource; Grafana downloads these plugins
+      # on first boot (needs internet that one time). marcusolsson-dynamictext-panel
+      # (Business Text) renders the Mermaid "Trace sequence" flowchart.
+      GF_INSTALL_PLUGINS: "grafana-clickhouse-datasource,marcusolsson-dynamictext-panel"
       # No login screen during the demo video — anonymous read-only access.
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
