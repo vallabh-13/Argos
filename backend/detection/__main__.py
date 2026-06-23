@@ -11,8 +11,9 @@ few seconds, evaluates any trace_id it hasn't seen yet. So once it's running you
 just emit a misbehaving trace (``python examples/emit_bad_trace.py``) and the
 dashboard lights up on its own — no need to re-run anything.
 
-Thresholds come from the ARGOS_LOOP_COUNT / ARGOS_FAILURE_COUNT /
-ARGOS_COST_LIMIT_USD env vars (see DetectionConfig.from_env).
+Thresholds resolve from argos.config.yml (the single bot-wrapping config), with
+the ARGOS_LOOP_COUNT / ARGOS_FAILURE_COUNT / ARGOS_COST_LIMIT_USD env vars still
+overriding at runtime (see DetectionConfig.from_config).
 """
 
 from __future__ import annotations
@@ -121,7 +122,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.watch and not args.trace_id:
         parser.error("give a trace_id, or use --watch")
 
-    config = DetectionConfig.from_env()
+    config = DetectionConfig.from_config()
 
     from backend.storage.clickhouse import get_client
 

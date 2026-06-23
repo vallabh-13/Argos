@@ -189,3 +189,19 @@ def test_config_from_env(monkeypatch):
     assert cfg.loop_count == 2
     assert cfg.cost_limit_usd == 0.50
     assert cfg.failure_count == 3  # untouched -> default
+
+
+def test_config_from_config_layers_file_then_env(tmp_path, monkeypatch):
+    # Precedence: built-in defaults < argos.config.yml < ARGOS_* env vars.
+    cfg_file = tmp_path / "argos.config.yml"
+    cfg_file.write_text(
+        "detection:\n  loop_count: 7\n  failure_count: 4\n  cost_limit_usd: 2.50\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ARGOS_CONFIG", str(cfg_file))
+    monkeypatch.setenv("ARGOS_LOOP_COUNT", "9")  # env overrides the file's 7
+
+    cfg = DetectionConfig.from_config()
+    assert cfg.loop_count == 9       # env wins
+    assert cfg.failure_count == 4    # from file
+    assert cfg.cost_limit_usd == 2.50  # from file

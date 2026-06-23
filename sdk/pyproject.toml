@@ -15,6 +15,9 @@ dependencies = [
     # The OTel SDK gives us trace/span id generation, timing, and context
     # propagation. The API package comes along as its dependency.
     "opentelemetry-sdk>=1.20.0",
+    # Reads the single bot-wrapping config file (argos.config.yml) so
+    # init_tracing() works with no arguments. Tiny, ubiquitous.
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]

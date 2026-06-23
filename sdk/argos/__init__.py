@@ -16,6 +16,7 @@ and the backend pipeline.
 from .span import Span, StepType, Status
 from .sinks import console_sink, KafkaSink
 from .tracing import init_tracing, trace_step, StepRecorder
+from .config import ArgosConfig, DetectionThresholds, load_config
 from .protocols import a2a_handoff, mcp_tool_call
 
 __all__ = [
@@ -27,6 +28,9 @@ __all__ = [
     "Status",
     "console_sink",
     "KafkaSink",
+    "ArgosConfig",
+    "DetectionThresholds",
+    "load_config",
     "a2a_handoff",
     "mcp_tool_call",
 ]

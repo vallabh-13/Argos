@@ -34,6 +34,9 @@ htmlcov/
 .env
 .env.*
 !.env.example
+# The real bot-wrapping config (may name internal backends/models); the
+# committed template is argos.config.example.yml.
+argos.config.yml
 *.pem
 *.key
 secrets.*

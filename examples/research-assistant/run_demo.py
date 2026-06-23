@@ -17,7 +17,9 @@ Run to the console (no pipeline needed):
     python examples/research-assistant/run_demo.py --scenario happy
 
 Run into the live pipeline (after `docker compose up -d`):
-    # set ARGOS_KAFKA_BOOTSTRAP=localhost:29092 in .env (or the shell)
+    # set `backend: localhost:29092` in argos.config.yml — that's all init_tracing()
+    # needs; this demo calls it with NO arguments and reads service + backend from
+    # that one file. Force a sink with --sink console / --sink kafka if you like.
     python examples/research-assistant/run_demo.py --scenario happy
 
 Scenarios:
@@ -29,14 +31,13 @@ Scenarios:
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from pathlib import Path
 
 # Make the demo's sibling modules importable no matter where this is launched from.
 sys.path.insert(0, str(Path(__file__).parent))
 
-from argos import init_tracing  # noqa: E402
+from argos import console_sink, init_tracing, load_config  # noqa: E402
 
 from bedrock_client import load_env, make_llm  # noqa: E402
 from agents.orchestrator import orchestrate  # noqa: E402
@@ -45,29 +46,41 @@ DEFAULT_QUESTION = "What is fusion energy and why does it matter?"
 
 
 def main(argv: list[str] | None = None) -> int:
-    load_env()  # pull .env in before we read ARGOS_KAFKA_BOOTSTRAP etc.
+    load_env()  # pull .env in for ARGOS_BEDROCK_MOCK / ARGOS_DEMO_MAX_RETRIES etc.
 
     parser = argparse.ArgumentParser(prog="run_demo.py", description="Argos multi-agent demo")
     parser.add_argument("--scenario", choices=["happy", "fail"], default="happy",
                         help="happy = clean run; fail = tool returns garbage and agents loop")
     parser.add_argument("--question", default=DEFAULT_QUESTION, help="the research question")
     parser.add_argument("--sink", choices=["auto", "console", "kafka"], default="auto",
-                        help="where spans go (auto = kafka if ARGOS_KAFKA_BOOTSTRAP set)")
+                        help="where spans go (auto = follow argos.config.yml 'backend')")
     args = parser.parse_args(argv)
 
-    bootstrap = os.getenv("ARGOS_KAFKA_BOOTSTRAP")
-    use_kafka = args.sink == "kafka" or (args.sink == "auto" and bootstrap)
+    # The whole point of the single-file flow: service name and span backend both
+    # come from argos.config.yml. We read it here only to (a) decide the closing
+    # message and (b) validate `--sink kafka`. Selecting the sink itself is left to
+    # init_tracing() so the demo genuinely exercises the no-arg path.
+    config = load_config()
+    backend = config.backend if config.has_backend else None
 
-    if use_kafka:
-        if not bootstrap:
-            parser.error("--sink kafka needs ARGOS_KAFKA_BOOTSTRAP set")
-        from argos import KafkaSink
-
-        init_tracing(service="research-assistant", sink=KafkaSink(bootstrap_servers=bootstrap))
-        print(f"=== Argos demo - publishing spans to Kafka @ {bootstrap} ===")
-    else:
-        init_tracing(service="research-assistant")
-        print("=== Argos demo - emitting spans to the console ===")
+    if args.sink == "console":
+        # Force console even if the config names a backend; service still from config.
+        init_tracing(sink=console_sink)
+        use_kafka = False
+        print("=== Argos demo - emitting spans to the console (forced via --sink console) ===")
+    elif args.sink == "kafka":
+        if not backend:
+            parser.error("--sink kafka needs a 'backend' in argos.config.yml")
+        init_tracing()  # no-arg: builds the Kafka sink from the config backend
+        use_kafka = True
+        print(f"=== Argos demo - publishing spans to Kafka @ {backend} (from argos.config.yml) ===")
+    else:  # auto — the single-file flow, init_tracing() with NO arguments
+        init_tracing()
+        use_kafka = backend is not None
+        if use_kafka:
+            print(f"=== Argos demo - publishing spans to Kafka @ {backend} (from argos.config.yml) ===")
+        else:
+            print("=== Argos demo - emitting spans to the console (no 'backend' in argos.config.yml) ===")
 
     llm = make_llm()
     print(f"LLM: {llm.describe()}")

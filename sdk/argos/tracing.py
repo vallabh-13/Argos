@@ -36,6 +36,7 @@ from opentelemetry.trace import (
     StatusCode,
 )
 
+from .config import load_config
 from .redaction import redact_mapping
 from .sinks import console_sink
 from .span import Span, Status, StepType, _utc_now
@@ -52,24 +53,50 @@ _sink: Callable[[Span], None] = console_sink
 
 
 def init_tracing(
-    service: str,
+    service: Optional[str] = None,
     *,
     extra_denylist_keys: Optional[Iterable[str]] = None,
     extra_patterns: Optional[Iterable[Any]] = None,
     sink: Optional[Callable[[Span], None]] = None,
+    config_path: Optional[str] = None,
 ) -> None:
     """Set up tracing once, at application startup.
 
+    The 2–3-line adoption promise, at its smallest: with an ``argos.config.yml``
+    present you can call ``init_tracing()`` with **no arguments** — ``service``
+    and the span ``backend`` are read from that file (see :mod:`argos.config`).
+
     ``service`` names the app being traced (e.g. ``"research-assistant"``) and
-    is stamped on every span. ``extra_denylist_keys`` / ``extra_patterns`` let a
-    user extend redaction for their own secret shapes. ``sink`` overrides where
-    finished spans go (default: print JSON to stdout) — used by tests and, in
-    Phase 2, by the Kafka producer.
+    is stamped on every span. If omitted, it falls back to ``service_name`` in
+    the config file. ``sink`` overrides where finished spans go; if omitted, a
+    :class:`KafkaSink` is built automatically when the config names a ``backend``,
+    otherwise spans print to stdout. ``extra_denylist_keys`` / ``extra_patterns``
+    let a user extend redaction for their own secret shapes. ``config_path``
+    points at a specific config file (default: auto-discovered).
     """
 
     global _service_name, _extra_denylist_keys, _extra_patterns, _tracer, _sink
 
-    _service_name = service
+    # The config file fills in anything the caller didn't pass explicitly. An
+    # explicit argument always wins over the file.
+    config = load_config(config_path)
+
+    resolved_service = service or config.service_name
+    if not resolved_service:
+        raise RuntimeError(
+            "init_tracing() needs a service name. Pass service=\"...\" or set "
+            "'service_name' in argos.config.yml (copy argos.config.example.yml)."
+        )
+
+    if sink is None and config.has_backend:
+        # Caller gave no sink but the config names a Kafka backend → wire it up
+        # for them. This is what makes `init_tracing()` with no args publish to
+        # the pipeline straight from the config file.
+        from .sinks import KafkaSink
+
+        sink = KafkaSink(bootstrap_servers=config.backend)  # type: ignore[arg-type]
+
+    _service_name = resolved_service
     _extra_denylist_keys = extra_denylist_keys
     _extra_patterns = extra_patterns
     if sink is not None:

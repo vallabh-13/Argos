@@ -1,0 +1,36 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Argos — the single bot-wrapping config file.
+#
+# Copy this to `argos.config.yml` (gitignored) and edit the values:
+#     cp argos.config.example.yml argos.config.yml
+#
+# This file holds ONLY non-secret settings. With it in place you can wrap your
+# bots in one line — `init_tracing()` reads everything from here:
+#
+#     from argos import init_tracing, trace_step
+#     init_tracing()                      # no args: pulls service_name + backend below
+#
+# ⚠️  AWS credentials are NOT in this file and never should be. boto3 resolves
+#     them from the standard AWS credential chain — run `aws configure` once
+#     locally, or rely on an attached IAM role in EKS/EC2.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Name stamped on every span — identifies the app being traced.
+service_name: research-assistant
+
+# Where finished spans go. Set to a Kafka bootstrap address to publish into the
+# pipeline; leave blank (or delete the line) to print spans to the console.
+backend: localhost:29092
+
+# ── Bedrock (the model your bots call) ──────────────────────────────────────
+# Non-secret. The model id and region; credentials come from `aws configure`.
+bedrock_model: anthropic.claude-3-haiku-20240307-v1:0
+aws_region: us-east-1
+
+# ── Detection thresholds ────────────────────────────────────────────────────
+# Tune what trips the Phase 4 rules. Env vars (ARGOS_LOOP_COUNT, etc.) still
+# override these at runtime so k8s/docker can retune without editing the file.
+detection:
+  loop_count: 5         # a step signature repeating this many times (>=) is a loop
+  failure_count: 3      # a tool failing this many times (>=) is a failure storm
+  cost_limit_usd: 1.00  # a run costing strictly MORE than this (>) is a cost spike

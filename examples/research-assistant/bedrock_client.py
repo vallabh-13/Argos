@@ -151,24 +151,33 @@ class BedrockLLM:
 
 
 def make_llm() -> Any:
-    """Build the LLM client from the environment.
+    """Build the LLM client from the single config file, with env fallback.
 
-    ``ARGOS_BEDROCK_MODEL`` is required (no hardcoded default) so a misconfigured
-    run fails loudly with a pointer to ``.env.example`` rather than silently
-    calling the wrong model. ``AWS_REGION`` defaults to us-east-1 (where Haiku
-    needs no inference profile).
+    The model id and region come from ``argos.config.yml`` (``bedrock_model`` /
+    ``aws_region``) — the one place Phase C puts non-secret settings. The legacy
+    ``ARGOS_BEDROCK_MODEL`` / ``AWS_REGION`` env vars still win if set, so old
+    ``.env`` setups keep working. A model id is required (no hardcoded default)
+    so a misconfigured run fails loudly rather than calling the wrong model.
     """
 
     load_env()
 
-    model = os.getenv("ARGOS_BEDROCK_MODEL")
+    # config file supplies the baseline; env vars override it.
+    try:
+        from argos import load_config
+
+        cfg = load_config()
+    except ImportError:
+        cfg = None
+
+    model = os.getenv("ARGOS_BEDROCK_MODEL") or (cfg.bedrock_model if cfg else None)
     if not model:
         raise SystemExit(
-            "ARGOS_BEDROCK_MODEL is not set.\n"
-            "Copy examples/research-assistant/.env.example to .env and set it "
-            "(see the demo README)."
+            "No Bedrock model configured.\n"
+            "Set 'bedrock_model' in argos.config.yml (copy argos.config.example.yml), "
+            "or ARGOS_BEDROCK_MODEL in .env."
         )
-    region = os.getenv("AWS_REGION", "us-east-1")
+    region = os.getenv("AWS_REGION") or (cfg.aws_region if cfg else None) or "us-east-1"
 
     if os.getenv("ARGOS_BEDROCK_MOCK", "").strip().lower() in ("1", "true", "yes"):
         return MockLLM(model=model)

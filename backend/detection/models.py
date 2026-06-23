@@ -77,11 +77,39 @@ class DetectionConfig:
     cost_limit_usd: float = 1.00
 
     @classmethod
-    def from_env(cls) -> "DetectionConfig":
-        """Read thresholds from env so docker/k8s can tune without code edits."""
+    def from_env(cls, base: "DetectionConfig | None" = None) -> "DetectionConfig":
+        """Read thresholds from env so docker/k8s can tune without code edits.
 
+        ``base`` supplies the fallback values (its own defaults if omitted), so
+        this can layer env overrides on top of config-file values.
+        """
+
+        base = base or cls()
         return cls(
-            loop_count=_env_int("ARGOS_LOOP_COUNT", cls.loop_count),
-            failure_count=_env_int("ARGOS_FAILURE_COUNT", cls.failure_count),
-            cost_limit_usd=_env_float("ARGOS_COST_LIMIT_USD", cls.cost_limit_usd),
+            loop_count=_env_int("ARGOS_LOOP_COUNT", base.loop_count),
+            failure_count=_env_int("ARGOS_FAILURE_COUNT", base.failure_count),
+            cost_limit_usd=_env_float("ARGOS_COST_LIMIT_USD", base.cost_limit_usd),
         )
+
+    @classmethod
+    def from_config(cls) -> "DetectionConfig":
+        """Resolve thresholds from the single config file, env still overriding.
+
+        Precedence (lowest → highest): built-in defaults → ``argos.config.yml``
+        → ``ARGOS_*`` env vars. This makes ``argos.config.yml`` the one place to
+        tune thresholds while keeping env overrides for k8s/docker. Falls back to
+        env-only if the SDK (which owns the config reader) isn't importable.
+        """
+
+        try:
+            from argos.config import load_config
+        except ImportError:
+            return cls.from_env()
+
+        det = load_config().detection
+        file_base = cls(
+            loop_count=det.loop_count,
+            failure_count=det.failure_count,
+            cost_limit_usd=det.cost_limit_usd,
+        )
+        return cls.from_env(base=file_base)

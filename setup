@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+# Argos setup — thin wrapper for `python -m argos setup` (macOS/Linux).
+# Picks whichever Python is on PATH.
+if command -v python3 >/dev/null 2>&1; then
+  exec python3 -m argos setup "$@"
+fi
+exec python -m argos setup "$@"
