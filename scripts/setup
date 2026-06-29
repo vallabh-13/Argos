@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+# Argos setup — fresh-clone bootstrap (macOS/Linux).
+# Installs the deps if they're missing, then runs the prerequisite checker.
+# Picks whichever Python is on PATH. Run it from anywhere: it finds bootstrap.py
+# next to itself, and bootstrap.py figures out the repo root on its own.
+DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if command -v python3 >/dev/null 2>&1; then
+  exec python3 "$DIR/bootstrap.py" "$@"
+fi
+exec python "$DIR/bootstrap.py" "$@"

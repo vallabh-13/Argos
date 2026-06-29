@@ -52,6 +52,9 @@ prometheus-data/
 grafana-data/
 *.log
 
+# Menu runtime state: the background ingest consumer's PID + log file.
+.argos/
+
 # ─── Editors / OS noise ────────────────────────────────────────────────────
 .vscode/
 .idea/

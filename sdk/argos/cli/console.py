@@ -17,9 +17,15 @@ import sys
 
 # Belt-and-suspenders: never let an un-encodable glyph crash the CLI. On a
 # legacy Windows code page (cp1252) a stray Unicode char would otherwise raise
-# UnicodeEncodeError mid-report; replacing is far better than aborting.
+# UnicodeEncodeError mid-report; replacing is far better than aborting. We also
+# force stdin to UTF-8 so a piped BOM decodes to a single U+FEFF the menu can
+# strip, rather than the mojibake "ï»¿" cp1252 would produce.
 try:  # pragma: no cover - depends on the host console
     sys.stdout.reconfigure(errors="replace")  # type: ignore[union-attr]
+except Exception:  # noqa: BLE001
+    pass
+try:  # pragma: no cover - depends on the host console
+    sys.stdin.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
 except Exception:  # noqa: BLE001
     pass
 
@@ -36,6 +42,8 @@ _U = _unicode_ok()
 RULE = "─" if _U else "-"   # heading underline
 ARROW = "↳" if _U else ">"  # guidance prefix
 DASH = "—" if _U else "-"   # detail separator
+DOT = "·" if _U else "|"    # inline list separator
+CHECK = "✅" if _U else "[ OK ]"  # friendly "done" mark for confirmations
 
 # --- ANSI codes -----------------------------------------------------------
 _RESET = "\033[0m"
@@ -137,3 +145,41 @@ def line(marker: str, label: str, detail: str = "") -> None:
     if detail:
         text += f" {dim(DASH)} {detail}"
     print(text)
+
+
+# --- interactive input helpers (used by the menu, C4/C5) ------------------
+# All three degrade gracefully on EOF (e.g. piped/non-interactive stdin) by
+# returning the default, so the menu never crashes when there's no real TTY.
+def prompt(question: str, default: str = "") -> str:
+    """Ask for a line of text; return the default on empty input or EOF."""
+
+    suffix = f" [{default}]" if default else ""
+    try:
+        answer = input(f"{cyan('?')} {question}{suffix}: ").strip()
+    except EOFError:
+        print()
+        return default
+    return answer or default
+
+
+def confirm(question: str, default: bool = True) -> bool:
+    """Ask a yes/no question; return ``default`` on empty input or EOF."""
+
+    hint = "Y/n" if default else "y/N"
+    try:
+        answer = input(f"{cyan('?')} {question} [{hint}]: ").strip().lower()
+    except EOFError:
+        print()
+        return default
+    if not answer:
+        return default
+    return answer in ("y", "yes")
+
+
+def pause(message: str = "Press Enter to return to the menu...") -> None:
+    """Block until the user hits Enter (no-op when there's no TTY)."""
+
+    try:
+        input("\n" + dim(message))
+    except EOFError:
+        pass

@@ -24,7 +24,12 @@ backend: localhost:29092
 
 # ── Bedrock (the model your bots call) ──────────────────────────────────────
 # Non-secret. The model id and region; credentials come from `aws configure`.
-bedrock_model: anthropic.claude-3-haiku-20240307-v1:0
+# NOTE: real Bedrock runs also need MODEL ACCESS enabled for this model in the
+# AWS Bedrock console (Model access page) — that's separate from credentials.
+# This Haiku 4.5 id works via the `us.` inference profile (boto3 adds the prefix
+# automatically when the model requires it). The old Claude 3 Haiku id no longer
+# works out of the box.
+bedrock_model: anthropic.claude-haiku-4-5-20251001-v1:0
 aws_region: us-east-1
 
 # ── Detection thresholds ────────────────────────────────────────────────────

@@ -61,7 +61,32 @@
       "PowerShell($py = \"C:\\\\Users\\\\Vallabh\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python313\\\\python.exe\"; & $py -m pytest sdk/tests/test_config.py sdk/tests/test_tracing.py -q 2>&1 | Select-Object -Last 30)",
       "PowerShell($py = \"C:\\\\Users\\\\Vallabh\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python313\\\\python.exe\"; & $py -m pytest backend/tests/test_detection.py -q 2>&1 | Select-Object -Last 20)",
       "PowerShell(git check-ignore *)",
-      "PowerShell($py = \"C:\\\\Users\\\\Vallabh\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python313\\\\python.exe\"; & $py -m argos setup; Write-Output \"=== exit code: $LASTEXITCODE ===\")"
+      "PowerShell($py = \"C:\\\\Users\\\\Vallabh\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python313\\\\python.exe\"; & $py -m argos setup; Write-Output \"=== exit code: $LASTEXITCODE ===\")",
+      "Skill(claude-api)",
+      "PowerShell($py = \\(Get-Command py -ErrorAction SilentlyContinue\\); if \\($py\\) { \"py found\" } else { \"no py\" }; $python = \\(Get-Command python -ErrorAction SilentlyContinue\\); if \\($python\\) { \"python: \" + $python.Source } else { \"no python\" })",
+      "PowerShell(Get-Command *)",
+      "PowerShell($py = \"C:\\\\Users\\\\Vallabh\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python313\\\\python.exe\"; cd D:\\\\Argos\\\\sdk; & $py -m pytest tests/test_cli_instrument.py tests/test_cli_menu.py tests/test_cli_setup.py -q 2>&1 | Select-Object -Last 30)",
+      "PowerShell($py = \"C:\\\\Users\\\\Vallabh\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python313\\\\python.exe\"; $env:PYTHONIOENCODING=\"utf-8\"; & $py \"$env:TEMP\\\\show_flows.py\")",
+      "PowerShell($py = \"C:\\\\Users\\\\Vallabh\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python313\\\\python.exe\"; Write-Output \"=== UTF-8 terminal ===\"; $env:PYTHONIOENCODING=\"utf-8\"; & $py \"$env:TEMP\\\\show_menu.py\"; Write-Output \"\"; Write-Output \"=== Legacy cp1252 terminal \\(ASCII fallback\\) ===\"; $env:PYTHONIOENCODING=\"cp1252\"; & $py \"$env:TEMP\\\\show_menu.py\" 2>&1 | Select-Object -First 6)",
+      "PowerShell($py = \"C:\\\\Users\\\\Vallabh\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python313\\\\python.exe\"; Write-Output \"=== cp1252 fallback \\(should be plain ASCII, no replacement chars\\) ===\"; $env:PYTHONIOENCODING=\"cp1252\"; & $py \"$env:TEMP\\\\show_menu.py\"; Write-Output \"\"; Write-Output \"=== tests ===\"; $env:PYTHONIOENCODING=\"utf-8\"; cd D:\\\\Argos\\\\sdk; & $py -m pytest tests/test_cli_instrument.py tests/test_cli_menu.py tests/test_cli_setup.py -q 2>&1 | Select-Object -Last 5)",
+      "PowerShell($py = \"C:\\\\Users\\\\Vallabh\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python313\\\\python.exe\"; $env:PYTHONIOENCODING=\"utf-8\"; & $py \"$env:TEMP\\\\show_demo.py\")",
+      "PowerShell($py = \"C:\\\\Users\\\\Vallabh\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python313\\\\python.exe\"; $env:PYTHONIOENCODING=\"utf-8\"; cd D:\\\\Argos\\\\sdk; & $py -m pytest tests/ -q 2>&1 | Select-Object -Last 8)",
+      "Bash(ls -d /c/Python* /c/Users/Vallabh/AppData/Local/Programs/Python/* /c/Users/Vallabh/AppData/Local/Microsoft/WindowsApps/python*)",
+      "Read(//c/Users/Vallabh/anaconda3/**)",
+      "Bash(/c/Users/Vallabh/AppData/Local/Programs/Python/Python313/python.exe --version)",
+      "Bash(/c/Users/Vallabh/AppData/Local/Programs/Python/Python313/python.exe -c 'import argos; print\\('\\\\''argos OK'\\\\'', argos.__file__\\)')",
+      "Bash(\"/c/Users/Vallabh/AppData/Local/Programs/Python/Python313/python.exe\" -m pytest -q)",
+      "Bash(/c/Users/Vallabh/AppData/Local/Programs/Python/Python313/python.exe -c 'import clickhouse_connect; print\\('\\\\''clickhouse_connect OK'\\\\''\\)')",
+      "Bash(\"/c/Users/Vallabh/AppData/Local/Programs/Python/Python313/python.exe\" -)",
+      "Bash(cd *)",
+      "Bash(git rm *)",
+      "Bash(git mv *)",
+      "Bash(grep -viE '^\\\\./\\\\.git/')",
+      "Bash(grep -viE '^\\\\./\\\\.git/|argos setup|run_setup|def setup|cli/setup|cli\\\\.setup|setup\\\\.py|test_cli_setup|_ensure|project setup|safe.*setup|setup checker|setup =|setup\\\\\\(|prerequisite')",
+      "Bash(grep -nE '```mermaid' README.md)",
+      "Bash(grep -c '```mermaid' README.md)",
+      "Bash(echo \"lines: $\\(wc -l < README.md\\) | mermaid diagrams: $\\(grep -c '```mermaid' README.md\\) | sections: $\\(grep -cE '^## ' README.md\\)\")",
+      "Bash(git checkout *)"
     ]
   }
 }

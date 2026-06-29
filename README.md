@@ -1,445 +1,295 @@
-# Argos — Distributed Tracing for Multi-Agent AI Systems
+# Argos
 
-> The black box flight recorder for teams of AI agents. When several agents work
-> together and something goes wrong, Argos reconstructs the entire step-by-step
-> story across every agent and tool — so you can see *what* happened and *why*,
-> not just that the final answer was wrong.
+> Argos is a distributed tracing system for AI applications where several agents work together. When a team of agents returns a wrong answer, Argos rebuilds the full story across every agent and every tool, so you can see what happened and why, not only that the final result was wrong.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-![Status](https://img.shields.io/badge/status-early%20development-orange)
-![Built with OpenTelemetry](https://img.shields.io/badge/built%20on-OpenTelemetry-7F77DD)
+![Status](https://img.shields.io/badge/status-working%20demo-brightgreen)
+![Built on OpenTelemetry](https://img.shields.io/badge/built%20on-OpenTelemetry-7F77DD)
+![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
 
----
+**Status.** This is a working demo, built in public as a learning project by an aspiring cloud and platform engineer. The local stack runs end to end with one command. It is not production hardened, and the roadmap below is honest about what is done and what is still planned.
+
+![Argos architecture](docs/images/architecture.png)
 
 ## Table of contents
 
-1. [The problem in one paragraph](#1-the-problem-in-one-paragraph)
-2. [What Argos actually is](#2-what-argos-actually-is)
-3. [Who this is for](#3-who-this-is-for)
-4. [What makes Argos different](#4-what-makes-argos-different)
-5. [How it works — the big picture](#5-how-it-works--the-big-picture)
-6. [The architecture, piece by piece](#6-the-architecture-piece-by-piece)
-7. [The full tech stack and why each tool](#7-the-full-tech-stack-and-why-each-tool)
-8. [Security — what we protect and how](#8-security--what-we-protect-and-how)
-9. [What the end product looks like](#9-what-the-end-product-looks-like)
-10. [Quickstart (the 10-minute promise)](#10-quickstart-the-10-minute-promise)
-11. [The build plan — phase by phase](#11-the-build-plan--phase-by-phase)
-12. [Project structure](#12-project-structure)
-13. [Honest limitations](#13-honest-limitations)
-14. [Contributing](#14-contributing)
-15. [License](#15-license)
+1. [Overview](#1-overview)
+2. [The problem](#2-the-problem)
+3. [What Argos does](#3-what-argos-does)
+4. [Architecture](#4-architecture)
+5. [How a trace flows](#5-how-a-trace-flows)
+6. [Components](#6-components)
+7. [Technology stack](#7-technology-stack)
+8. [Security](#8-security)
+9. [Quickstart](#9-quickstart)
+10. [Instrumenting your own agents](#10-instrumenting-your-own-agents)
+11. [What the dashboard shows](#11-what-the-dashboard-shows)
+12. [Project status and roadmap](#12-project-status-and-roadmap)
+13. [Project structure](#13-project-structure)
+14. [Limitations](#14-limitations)
+15. [Contributing](#15-contributing)
+16. [License](#16-license)
 
----
+## 1. Overview
 
-## 1. The problem in one paragraph
+Modern AI applications no longer run as a single model call. A user request can fan out across an orchestrator agent, a search agent, several tools, and a summarizer, and increasingly these agents hand work to one another over open protocols such as MCP (Model Context Protocol) and A2A (Agent to Agent). When the final answer is wrong, you are left with the answer and nothing else. You cannot see the dozen steps that produced it.
 
-AI "agents" are programs that use a language model to make decisions and take
-actions — calling tools, querying databases, and increasingly *handing work off
-to other agents*. A single user request can now fan out across a research agent,
-a search agent, three tools, and a summarizer agent. When the final answer comes
-back wrong, you are blind: you see a bad result with no map of the dozen steps
-that produced it. Existing tools trace a **single** agent's run well, but the
-moment agents talk to *each other* — over emerging protocols like **MCP** (Model
-Context Protocol) and **A2A** (Agent-to-Agent) — the story scatters across all of
-them and nobody can reassemble it. That reassembly is the unsolved gap Argos fills.
+Argos applies distributed tracing, the same proven pattern that large cloud companies use to debug microservices, to teams of cooperating agents. It records every step each agent takes, stitches those scattered records into one causal timeline keyed by a shared trace id, stores them for fast querying, and shows the whole picture on a dashboard with cost per run and clear flags wherever something broke.
 
----
+The interesting engineering is not machine learning. It is a distributed systems problem: correlating events that arrive out of order, from independent processes, into a single coherent story. That is the platform and infrastructure lane, and it is what this project is built to demonstrate and to teach me.
 
-## 2. What Argos actually is
+## 2. The problem
 
-Think of AI agents as employees in an office doing a task for you. They talk to
-each other, use tools, and come back with an answer — but you can't *see* what
-they did while working. Argos is the **security-camera-plus-logbook** for that
-office. It does three simple jobs:
+Tools that observe a single agent already exist and several are excellent. The gap appears the moment agents talk to each other. The steps of one user request scatter across multiple agents and tools, each emitting its own logs, and nobody reassembles them into one timeline. You can see that agent A failed, or that tool B returned nothing, but you cannot see that tool B returned nothing on step three and that everything after step three was doomed because of it.
 
-1. **Record** — sits beside the agents and writes down every step they take.
-2. **Organize** — collects those scattered notes and stitches them into one
-   clean, readable timeline.
-3. **Show** — displays that timeline on a screen: who did what, in what order,
-   how long it took, what it cost, and a red flag wherever something broke.
+Argos focuses on that reassembly. It treats a run as a tree of steps that share one trace id, rebuilds the parent and child relationships even when records arrive in any order, and surfaces the failure chain across agent boundaries.
 
-Everything technical in this document is just *how we do those three jobs well
-enough that other people can run it too.*
+## 3. What Argos does
 
-The deeper truth that makes this a serious engineering project: **this is
-distributed tracing** — the same battle-tested pattern Netflix and every major
-cloud company uses to debug microservices — adapted to AI agents. The concept
-transfers, but agents break the old assumptions (see
-[Section 4](#4-what-makes-argos-different)).
+Think of a team of agents as employees in an office working on a task for you. They talk to each other, use tools, and come back with an answer, but you cannot watch them while they work. Argos is the security camera and the logbook for that office, and it does three jobs.
 
----
+1. Record. A small SDK sits beside your agents and writes down every step they take.
+2. Organize. A backend pipeline collects those scattered records and stitches them into one clean timeline.
+3. Show. A dashboard displays that timeline: who did what, in what order, how long it took, what it cost, and a red flag wherever something broke.
 
-## 3. Who this is for
+Everything technical in this document is simply how those three jobs are done well enough that someone else can run it too.
 
-The people who would **use** Argos are the same people who **hire** for the
-roles it targets:
+## 4. Architecture
 
-- **Platform / infrastructure engineers** putting agents into production and
-  needing to keep them reliable.
-- **SRE / DevOps teams** who get paged when an agent system misbehaves at 3 AM.
-- **AI engineering teams** shipping multi-agent features who are currently
-  "debugging blind."
-- **FinOps / cost owners** who need to know which agent run burned $400 in
-  tokens overnight.
+The system has three layers: an SDK that lives inside your application, a backend pipeline that runs as containers, and a dashboard. The diagram below shows how a span travels from your agents all the way to Grafana.
 
-If you are building anything where **more than one agent** cooperates, Argos is
-for you.
+```mermaid
+flowchart LR
+    subgraph app["Your multiagent application"]
+        direction TB
+        o[Orchestrator agent] --> s[Search agent]
+        s --> sum[Summarizer agent]
+        s -->|tool call over MCP| tool[Web search tool]
+    end
 
----
-
-## 4. What makes Argos different
-
-Being honest: this space is **not** empty. Langfuse, LangSmith, Arize Phoenix,
-Helicone, Datadog LLM Observability, and others already do agent observability,
-and several are excellent. Argos does **not** try to beat them at their own game.
-It owns a specific, underserved slice:
-
-| Existing tools do this well | Argos focuses here instead |
-|---|---|
-| Trace a **single** agent's steps | Correlate traces across **many** agents |
-| Generic LLM request/response logging | **Protocol-aware**: understands MCP tool calls + A2A handoffs |
-| Treat cost as a summary metric | Track cost **per step**, flag runaway loops live |
-| Security as an afterthought | **Secure by default** — secret redaction built in from step one |
-
-**The one-sentence pitch:**
-
-> Argos is an OpenTelemetry-native distributed tracing system that reconstructs
-> the full execution of *multi-agent* AI systems communicating over MCP and A2A —
-> surfacing causal failure chains, runaway loops, and per-run cost that
-> single-agent tools miss.
-
-**Why this is a standout portfolio piece, specifically:**
-
-- It is built on a **proven cloud pattern** (distributed tracing), so every
-  design decision is defensible in an interview.
-- The hard part — correlating spans across independent agents — is a **distributed
-  systems problem**, not an ML problem. That is the cloud/infra/networking lane.
-- It uses the exact keywords cloud + platform JDs are screaming for in 2026:
-  OpenTelemetry, Kafka, Kubernetes, ClickHouse, MCP, A2A, observability.
-- Shipping it **open source, installable, and documented** turns it from "a
-  student project" into "a tool people use" — a dramatically stronger signal.
-- **Security as a headline feature** (redaction, encryption, least-privilege)
-  differentiates it from the many agent tools that bolt security on later.
-
----
-
-## 5. How it works — the big picture
-
-One trace's journey, end to end:
-
-```
-  Someone's multi-agent app
-  (research agent → search agent → tools → summarizer)
-            │
-            │  Argos SDK emits a "span" at every step
-            │  (a span = one recorded action, tagged with a shared trace ID)
-            ▼
-   ┌─────────────────────────────────────────────┐
-   │              ARGOS BACKEND (on K8s)          │
-   │                                              │
-   │   Kafka  ──►  Correlation  ──►  ClickHouse   │
-   │  (buffer)      engine          (storage)     │
-   │                  │                           │
-   │                  ▼                           │
-   │      Detect loops / failures / cost spikes   │
-   │           → fire alerts (Prometheus)         │
-   └─────────────────────────────────────────────┘
-            │
-            ▼
-       Dashboard (Grafana / React)
-   trace graph · cost-per-run · red alerts
-   ← this is your demo video
+    app -->|Argos SDK emits<br/>one span per step| kafka[(Kafka topic<br/>argos.spans)]
+    kafka --> consumer[Ingest consumer]
+    consumer --> ch[(ClickHouse)]
+    ch --> watch[Correlation and detection<br/>watch loop]
+    watch -->|assembled trace tree| ch
+    watch -->|findings as metrics| prom[(Prometheus)]
+    ch --> grafana[Grafana dashboard]
+    prom --> grafana
 ```
 
-**Read it as a story:** the SDK records → Kafka safely carries the flood of
-records → the correlation engine reassembles them into one timeline → ClickHouse
-files them away → the detection layer watches for trouble → the dashboard shows
-a human the whole picture.
+Read it as a story. The SDK records each step and publishes it to Kafka. Kafka safely carries the flood of records. The ingest consumer drains Kafka into ClickHouse. The watch loop reads spans, reconstructs the causal tree, writes the assembled trace back to ClickHouse, and reports any findings to Prometheus. Grafana reads from ClickHouse and Prometheus and draws the picture for a human.
 
----
+## 5. How a trace flows
 
-## 6. The architecture, piece by piece
+This is the failure scenario from the bundled demo, where a tool keeps returning garbage and the search agent retries until it hits a safe cap. Every step is recorded under one shared trace id, so Argos can later show the exact point where the run went wrong.
 
-### Piece 1 — The SDK (shipped as code, no UI)
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant O as Orchestrator
+    participant S as Search agent
+    participant T as Web search tool
+    participant SU as Summarizer
+    U->>O: ask a question
+    O->>S: hand off the task over A2A
+    loop retry until the cap
+        S->>T: call the tool over MCP
+        T-->>S: malformed result
+    end
+    S->>SU: hand off the findings
+    SU-->>O: degraded answer
+    Note over O,SU: Argos records every step under one trace id
+```
 
-A lightweight Python package a user installs with `pip install argos-sdk`. They
-wrap their agents with it in **2–3 lines**, and it quietly emits an OpenTelemetry
-span for every step: tool calls, agent-to-agent handoffs, LLM calls, decisions.
-Each span carries the same **trace ID** so they can be reassembled later.
+In a normal tool you would see only that the task failed. In Argos the retry loop shows up as a repeating run of failing tool calls, the detection rules flag a runaway loop and a repeated tool failure, and you can click straight to the step where it broke.
 
-- **Lives:** inside the user's application.
-- **Job:** record, and redact secrets *before* anything leaves the user's machine.
-- **Design rule:** dead simple. If adoption takes 40 lines, the project fails.
+## 6. Components
 
-### Piece 2 — The backend (runs on Kubernetes — the impressive part)
+**The SDK.** A small Python package that lives inside your application. You wrap each agent step in a context manager and it emits one OpenTelemetry span per step, tagged with a shared trace id, covering tool calls, agent handoffs, model calls, and decisions. The whole point is that adoption stays two or three lines of code. It also redacts secrets before any span leaves your machine.
 
-This is where the cloud-engineering proof lives. Three sub-components:
+**The backend pipeline.** This is where the cloud engineering lives. Kafka is the ingestion buffer, so a burst of thousands of spans cannot overwhelm the system. The ingest consumer drains Kafka into ClickHouse using at least once delivery, so a restart never loses a span. The correlation engine groups every span that shares a trace id and rebuilds the causal tree, which is the part that single agent tools handle weakest. The detection layer scans assembled traces for runaway loops, repeated tool failures, and cost spikes, and exposes the results as Prometheus metrics.
 
-- **Kafka (ingestion buffer):** spans arrive here first. A burst of thousands of
-  spans cannot crash the system; Kafka absorbs the flood and lets the rest of the
-  pipeline consume at its own pace.
-- **Correlation engine (the novel core):** pulls spans off Kafka, groups every
-  span sharing a trace ID, and rebuilds the causal timeline — who called whom, in
-  what order, where the chain broke. This is the part existing tools are weakest
-  at for multi-agent flows.
-- **ClickHouse (storage):** the assembled traces are stored in a column database
-  built for exactly this — fast queries over huge volumes of trace/event data.
+**The dashboard.** Grafana, provisioned automatically from the repo. It reads from ClickHouse and Prometheus and draws the trace as a readable timeline, with cost per run and panels that turn red when a finding fires. The dashboard is the small visible tip of the system. The backend is the substantial part.
 
-Alongside these runs a **detection layer** that scans incoming traces for trouble
-patterns (runaway loops, repeated tool failures, cost spikes) and fires alerts.
+## 7. Technology stack
 
-### Piece 3 — The dashboard (the only website-like piece)
+Each choice is deliberate, and for several of them a lighter option would be enough at demo volume. They are included to practice the pattern that scales to production.
 
-Reads from ClickHouse and draws the picture: the multi-agent trace as a visual
-graph, cost-per-run, where loops/failures happened, and live alerts. Built on
-Grafana first (fast, free, looks professional), with an optional custom React
-view later.
+- Instrumentation: OpenTelemetry with OpenInference conventions. The industry standard format for emitting spans, so traces stay interoperable.
+- Language: Python for the SDK, the correlation engine, and the consumers.
+- Agents traced in the demo: AWS Bedrock running Claude Haiku 4.5, communicating over MCP and A2A.
+- Ingestion buffer: Apache Kafka, the standard for event streaming.
+- Storage: ClickHouse, a columnar database designed for fast queries over very large volumes of trace data.
+- Metrics and alerting: Prometheus, the common cloud metrics standard.
+- Dashboards: Grafana, free, professional, and a natural pair with Prometheus and ClickHouse.
+- Containers: Docker, so the whole stack starts with one command.
+- Orchestration: Kubernetes with Helm, planned for the cloud deployment phase.
+- Infrastructure as code: Terraform, planned for the AWS deployment phase.
+- Continuous integration: GitHub Actions runs the test suite on every push.
+- Cloud target: AWS using EKS, MSK, and S3, planned.
 
-> **Build priority:** the backend (Piece 2) is what gets you hired. The dashboard
-> is the small visible tip — build it last, just polished enough for the demo.
-> Do **not** sink weeks into a pretty UI.
+A note for interviews. You do not strictly need Kafka or Kubernetes at this data volume. They are included on purpose to demonstrate the production pattern. The senior framing is to say exactly that: at this scale a lighter queue would be enough, and Kafka is here to show the design that scales to production volume. Knowing the tradeoff, not only the tool, is the signal.
 
----
+## 8. Security
 
-## 7. The full tech stack and why each tool
+The moment Argos records what agents do, it holds sensitive data: user questions, the data agents touched, API keys, and customer information. Recording it makes protecting it a responsibility, so security is treated as a feature rather than an afterthought.
 
-| Layer | Tool | What it does here | Why this one |
-|---|---|---|---|
-| Instrumentation | **OpenTelemetry** + OpenInference | The standard format for emitting spans | Industry standard = interoperable, not lock-in |
-| Language | **Python** | The SDK + engine logic | Dominant in the AI/agent ecosystem; you know it |
-| Agents being traced | **AWS Bedrock / AgentCore**, **MCP**, **A2A** | The systems Argos observes | The hottest, most in-demand keywords of 2026 |
-| Ingestion buffer | **Apache Kafka** | Absorbs the flood of incoming spans | The production standard for event streaming |
-| Stream processing | Kafka consumers (Python) | Pull + enrich spans in flight | Keeps the pipeline decoupled and resilient |
-| Correlation engine | **Python** (optionally **Go** later) | Stitches spans into causal traces | The core logic; Python first for speed of building |
-| Storage | **ClickHouse** | Stores assembled traces, fast to query | Purpose-built for high-volume trace/event data |
-| Metrics + alerting | **Prometheus** | Tracks cost, loop counts, failures; fires alerts | The de-facto cloud metrics standard |
-| Dashboards | **Grafana** (+ optional React) | Visualizes traces, cost, alerts | Free, professional, pairs natively with Prometheus |
-| Containerization | **Docker** | Packages every service | Universal; enables one-command setup |
-| Orchestration | **Kubernetes** (+ **Helm**) | Runs the whole backend as a system | The core platform-engineering keyword |
-| Infra as code | **Terraform** | Provisions cloud resources reproducibly | Your existing strength; #1 IaC tool |
-| CI/CD | **GitHub Actions** | Tests + builds on every push | Proves the project is real and maintained |
-| Cloud | **AWS** (EKS, MSK, S3) | Hosts the deployed version | Your certified platform |
+- Secret redaction. The SDK automatically blanks passwords, API keys, and tokens before a span ever leaves your machine. It uses both a denylist of sensitive key names and pattern matching on values, and the demo plants a fake secret on a span to prove the redaction runs on real traces.
+- Secrets never live in committed files. AWS credentials come from the standard credential chain, either through aws configure locally or an attached role in the cloud. The config file holds only non secret settings, and the real config is ignored by git.
+- Planned hardening. Encryption in transit over TLS, encryption at rest in storage, access control with roles, and configurable data retention are on the roadmap, framed honestly as planned rather than shipped.
 
-**A note for interviews:** you do not strictly *need* Kafka and Kubernetes at a
-student's data volume. You include them deliberately to demonstrate the
-production-scale pattern. The senior move is to say exactly that: *"At my scale a
-lighter queue would suffice; I used Kafka to demonstrate the pattern that scales
-to production volume."* Knowing the tradeoff — not just the tool — is the signal.
+What this project does not claim: compliance certification, a formal security audit, or hardened isolation between tenants. Doing the obvious security well and being honest about the rest is the intent.
 
----
+## 9. Quickstart
 
-## 8. Security — what we protect and how
-
-The moment Argos records what agents do, it holds sensitive data: user questions,
-private data the agents touched, API keys, customer info. Recording it means we
-are responsible for protecting it. **This is a headline feature, not an
-afterthought** — and it plays to a networking/security background.
-
-What we build, from easiest to most involved:
-
-1. **Secret redaction (the #1 expected feature).** The SDK automatically blanks
-   out passwords, API keys, and tokens *before* a span ever leaves the user's
-   machine — like a statement showing `****1234`. Pattern-based detection plus a
-   user-configurable denylist.
-2. **Encryption in transit.** All spans travel over **TLS/HTTPS** so nobody can
-   eavesdrop between the agents and the backend.
-3. **Encryption at rest.** The ClickHouse storage is encrypted (an AWS setting
-   you enable), so stolen files are unreadable.
-4. **Access control.** A login plus role-based permissions so only authorized
-   people view traces. No open door to everyone's agent activity.
-5. **Data retention limits.** Old traces auto-delete after a configurable window.
-   Less data sitting around = less that can leak.
-
-**What we deliberately do NOT promise:** enterprise compliance (SOC2, etc.),
-formal security audits, or hardened multi-tenant isolation. That is out of scope
-for an open-source learning project, and the README says so plainly (see
-[Limitations](#13-honest-limitations)). Doing the *obvious* security well and
-being *honest* about the rest is exactly what good engineers do.
-
----
-
-## 9. What the end product looks like
-
-When Argos is running, here is the experience — and the 90-second demo video that
-goes on your LinkedIn and resume:
-
-- **Scene 1 — setup (15s):** a multi-agent system runs on screen: a research
-  agent delegating to a search agent and a summarizer, all over A2A, calling
-  tools over MCP.
-- **Scene 2 — normal run (20s):** you start a task. The dashboard lights up with
-  a live trace graph — boxes per agent, arrows showing handoffs, tool calls
-  branching off. Cost ticks up: `$0.04 … $0.07 … done`. Total: 8 steps, 2.3s,
-  `$0.11`.
-- **Scene 3 — the money shot (40s):** you inject a failure (make a tool return
-  garbage). The two agents get stuck in a retry loop. On a normal tool you'd see
-  only "task failed." On Argos, the trace graph turns **red at the exact failing
-  span**, an alert fires (`runaway loop detected, 14 steps, cost spiking`), and
-  you click straight to the step where it broke: *"step 3: search tool returned
-  empty — everything after was doomed."*
-- **Scene 4 — the punchline (15s):** *"This is the difference between knowing your
-  agent failed and knowing why. Most tools show you the final output. Argos shows
-  you the 14-step causal chain — across multiple agents and tools."*
-
-That clip is the entire value of the project in 90 seconds: visual, a problem
-people recognize, and real infrastructure working.
-
----
-
-## 10. Quickstart (the 10-minute promise)
-
-> Adoption dies if setup takes an afternoon. The whole stack must come up with
-> one command, with a runnable example that produces a trace within minutes.
+The whole stack comes up with one Docker command, and a guided console walks you from a fresh clone to a live trace.
 
 ```bash
 # 1. Clone
 git clone https://github.com/<you>/argos.git
 cd argos
 
-# 2. Bring the whole backend up (Kafka, correlation engine, ClickHouse, Grafana)
-docker compose up
+# 2. Create and activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate          # Windows PowerShell: .venv\Scripts\Activate.ps1
 
-# 3. In another terminal, run the bundled multi-agent example
-cd examples/research-assistant
-pip install -r requirements.txt
-aws configure        # once — Bedrock creds via the standard AWS credential chain
-python run_demo.py
+# 3. Install everything: the SDK, the backend pipeline, and the demo
+pip install -r requirements-all.txt
 
-# 4. Open the dashboard — a trace should already be visible
-open http://localhost:3000
+# 4. Check your machine has the prerequisites
+python -m argos setup
+
+# 5. Open the guided console and follow the numbered steps
+python -m argos
 ```
 
-Wrapping your *own* agents is the 2–3 line promise:
+On a brand new clone you can skip steps 3 and 4 and run the bootstrap, which installs the dependencies for you and then runs the checker.
+
+```bash
+python scripts/bootstrap.py     # or  ./scripts/setup  on macOS and Linux,  scripts\setup.cmd  on Windows
+```
+
+The guided console gives you a numbered menu.
+
+```
+1) Connect AWS          run aws configure (optional, the demo also runs in mock mode)
+2) Start backend        docker compose up, health checked, plus the ingest consumer and detector
+3) Instrument my agents the one code change for your own app (writes argos.config.yml)
+4) Run demo             emit real spans through the pipeline (happy or fail)
+5) Open dashboard       Grafana at http://localhost:3000
+6) Settings             view argos.config.yml
+```
+
+For the fastest path to a visible trace, choose 2, then 4, then 5. Start the backend, run the demo so spans actually flow, then open the dashboard. The dashboard is empty until spans arrive, so there is nothing to show until you run the demo or your own instrumented app. The first run of option 2 also creates argos.config.yml for you if it is missing, and it starts both the ingest consumer and the detector in the background so the dashboard fills in end to end with no extra terminals.
+
+On Windows, if python is not on your PATH, use the py launcher instead, for example py -m venv .venv and py -m argos. The bundled scripts\setup.cmd already prefers py.
+
+## 10. Instrumenting your own agents
+
+Two imports, one startup call, and a context manager around each step you want to trace.
 
 ```python
-from argos import trace_agents
+from argos import init_tracing, trace_step
 
-# wrap your existing multi-agent app — that's it
-with trace_agents(service="my-research-app"):
-    result = my_agent_system.run("Summarize the latest on fusion energy")
+init_tracing()                         # reads service_name and backend from argos.config.yml
+
+with trace_step(agent_name="search", step_type="tool_call", name="web.search") as step:
+    result = call_my_tool(query)
+    step.set_usage(model="...", tokens_in=120, tokens_out=80)   # optional, for cost
 ```
 
----
+init_tracing takes no arguments. It reads the service name and the span backend from argos.config.yml, and menu option 3 writes that file for you and prints these exact snippets with your own values filled in. With no backend set, spans print to the console. Set the backend to localhost:29092 to pipe them into the pipeline. The step type is one of llm_call, tool_call, a2a_handoff, or decision.
 
-## 11. The build plan — phase by phase
+## 11. What the dashboard shows
 
-Built in dependency order, with open-source requirements baked in from day one
-(not bolted on at the end). Each phase ends with something demonstrable.
+When the backend is running and a trace has flowed through, the Grafana dashboard shows the run as a readable timeline. Each step appears in sequence with its agent, its type, its duration, and its status. Cost is rolled up per run. Panels turn red when the detection rules fire, for example when a tool fails repeatedly or a run loops past its threshold, and you can drill into the exact step where the chain broke.
 
-### Phase 0 — Foundations
-- Repo, Apache 2.0 license, README (this file), CONTRIBUTING.md, issue templates.
-- `docker-compose.yml` skeleton; GitHub Actions running an empty test suite.
-- **Outcome:** a clean public repo that looks intentional from commit one.
+The architecture and flow diagrams above render directly on GitHub. To show the live dashboard, save a screenshot of your own running stack to docs/images/dashboard.png and uncomment the line below.
 
-### Phase 1 — The SDK + a span
-- Define what a "span" captures for an agent step (decision, tool call, handoff,
-  cost, tokens).
-- Build the OpenTelemetry-based SDK; emit spans from one simple agent.
-- Add secret redaction from the start.
-- **Outcome:** running an agent prints structured spans to the console.
+<!-- ![Argos dashboard](docs/images/dashboard.png) -->
 
-### Phase 2 — Ingestion pipeline
-- Stand up Kafka in Docker; SDK sends spans to it.
-- A Python consumer reads spans off Kafka and writes raw spans to ClickHouse.
-- **Outcome:** spans flow app → Kafka → ClickHouse and survive a restart.
+## 12. Project status and roadmap
 
-### Phase 3 — The correlation engine (the core)
-- Group spans by trace ID; reconstruct the causal timeline across **multiple**
-  agents and MCP/A2A handoffs.
-- Compute per-step and per-run cost.
-- **Outcome:** a stored, queryable, fully-stitched multi-agent trace.
+Built in dependency order, so each phase ends with something you can run and show.
 
-### Phase 4 — Detection + alerts
-- Rules for runaway loops, repeated tool failures, and cost spikes.
-- Export metrics to Prometheus; basic alerting.
-- **Outcome:** injecting a failure produces a real alert.
+Done and working in the local demo:
 
-### Phase 5 — The dashboard
-- Grafana dashboards: trace graph, cost-per-run, alert panel.
-- (Optional) a custom React trace-graph view if time allows.
-- **Outcome:** the demo video from [Section 9](#9-what-the-end-product-looks-like)
-  is recordable.
+- Phase 0, foundations. Repository, Apache 2.0 license, issue templates, the Docker stack skeleton, and GitHub Actions running the tests.
+- Phase 1, the SDK and a span. The OpenTelemetry based SDK emits structured spans for agent steps, with secret redaction from the start.
+- Phase 2, the ingestion pipeline. Spans travel from the app through Kafka to ClickHouse and survive a restart.
+- Phase 3, the correlation engine. Spans are grouped by trace id and stitched into a causal timeline across multiple agents and handoffs, with cost rolled up per run.
+- Phase 4, detection and alerts. Rules for runaway loops, repeated tool failures, and cost spikes export metrics to Prometheus.
+- Phase 5, the dashboard. Grafana is provisioned automatically, with panels that go red when a finding fires.
 
-### Phase 6 — Make it genuinely usable (open-source polish)
-- One-command `docker compose up`; a bundled, runnable example app.
-- Real docs: quickstart, architecture, "wrap your own agents," troubleshooting.
-- Kubernetes manifests + Helm chart; Terraform for an AWS (EKS) deploy.
-- Versioned release, tests, green CI.
-- **Outcome:** a stranger can clone, run, and trace their own agents in <10 min.
+In progress:
 
-### Phase 7 — Open-source contributions along the way
-- While building, you will hit real gaps in upstream projects (OpenLLMetry /
-  Traceloop, OpenTelemetry GenAI semantic conventions, MCP spec repos). Fixing one
-  and landing a merged PR is a resume line that beats almost any solo project,
-  because it proves you can work in a real codebase.
+- Phase 6, make it genuinely usable. A bundled multiple agent demo on AWS Bedrock, a richer trace detail view, one command startup, and the guided console that brings up the whole stack including the consumer and the detector.
 
----
+Planned:
 
-## 12. Project structure
+- Phase 7, cloud deployment. Kubernetes manifests with a Helm chart, and Terraform for an AWS deployment.
+- Ongoing, upstream contributions. Fixing real gaps in the surrounding open source projects as they come up.
+
+## 13. Project structure
 
 ```
 argos/
-├── README.md                  # this file
-├── LICENSE                    # Apache 2.0
-├── CONTRIBUTING.md
-├── docker-compose.yml         # one-command local stack
-├── .github/
-│   └── workflows/ci.yml       # tests + build on every push
-├── sdk/                       # Piece 1 — the Python SDK
-│   ├── argos/
-│   │   ├── tracing.py         # span emission (OpenTelemetry)
-│   │   ├── redaction.py       # secret blanking — security
-│   │   └── protocols/         # MCP + A2A span adapters
-│   └── tests/
-├── backend/                   # Piece 2 — the pipeline
-│   ├── ingest/                # Kafka consumers
-│   ├── correlation/           # the causal-stitching engine
-│   ├── detection/             # loop / failure / cost-spike rules
-│   └── storage/               # ClickHouse schema + access
-├── dashboard/                 # Piece 3 — Grafana configs (+ optional React)
-├── examples/
-│   └── research-assistant/    # bundled runnable multi-agent demo
-├── deploy/
-│   ├── helm/                  # Kubernetes Helm chart
-│   └── terraform/             # AWS (EKS, MSK, S3) provisioning
-└── docs/                      # quickstart, architecture, guides
+  README.md                   this file
+  LICENSE                     Apache 2.0
+  CLAUDE.md                   project context for the AI pair programmer
+  docker-compose.yml          one command local stack
+  argos.config.example.yml    copy to argos.config.yml to configure
+  requirements-all.txt        install the whole stack in one command
+  conftest.py                 test path setup
+  scripts/                    bootstrap.py and the setup launchers
+  .github/
+    workflows/ci.yml          tests and build on every push
+    CONTRIBUTING.md
+  sdk/                        the Python SDK
+    argos/
+      tracing.py              span emission on OpenTelemetry
+      redaction.py            secret blanking, security
+      sinks.py                console and Kafka outputs
+      config.py               the single config file reader
+      protocols/              MCP and A2A span adapters
+      cli/                    the guided console and setup checker
+    tests/
+  backend/                    the pipeline
+    ingest/                   Kafka consumer
+    correlation/              the causal stitching engine
+    detection/                loop, failure, and cost rules
+    storage/                  ClickHouse schema and access
+    tests/
+  examples/
+    emit_bad_trace.py         emit a deliberately broken trace
+    research-assistant/       bundled runnable multiple agent demo
+  deploy/                     configs for the docker compose stack
+    grafana/                  dashboards and datasource provisioning
+    prometheus/               scrape config
+  docs/                       quickstart, architecture, and guides
+    images/                   screenshots and diagrams
 ```
 
----
+## 14. Limitations
 
-## 13. Honest limitations
+Argos is an open source project built to demonstrate and to learn multiple agent observability.
 
-Argos is an open-source project built to demonstrate multi-agent observability.
+- It includes secret redaction, but it has not been security audited for production use.
+- It is not certified for any compliance regime such as SOC2 or HIPAA.
+- It targets a focused set of scenarios, agents that cooperate over MCP and A2A, rather than every agent framework in existence.
+- It prioritizes depth on the correlation problem over broad feature coverage.
 
-- It includes **secret redaction** and **encryption**, but has **not** been
-  security-audited for production use.
-- It is **not** certified for any compliance regime (SOC2, HIPAA, etc.).
-- It targets a focused set of scenarios (multi-agent flows over MCP/A2A) rather
-  than every agent framework in existence.
-- It prioritizes **depth on the multi-agent correlation problem** over broad
-  feature coverage. Use at your own risk; contributions welcome.
+This honesty is intentional. A small tool that does one hard thing well, and says clearly what it does not do, is more credible than one that overpromises.
 
-This honesty is intentional. A small tool that does one hard thing well — and
-says clearly what it does *not* do — is more credible than one that overpromises.
+## 15. Contributing
 
----
+Contributions are welcome. This project is built in public on purpose.
 
-## 14. Contributing
-
-Contributions are welcome — this project is built in public on purpose.
-
-- Read `CONTRIBUTING.md` for setup and the dev workflow.
-- Good first issues are labeled `good-first-issue`.
-- Open an issue before large changes so we can align on direction.
+- Read [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) for setup and the development workflow.
+- Good first issues are labeled good first issue.
+- Open an issue before large changes so we can agree on direction.
 - All contributions are under the Apache 2.0 license.
 
----
+## 16. License
 
-## 15. License
-
-Licensed under the **Apache License 2.0**. See [`LICENSE`](LICENSE) for details.
-
----
-
-> **Status:** early development, built in public as a learning project by an
-> aspiring cloud / platform engineer. Watch the repo to follow along, and feel
-> free to open an issue if multi-agent observability is your problem too.
+Licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.

@@ -14,6 +14,7 @@ or starts anything) — except the explicitly-named safe actions in
 
 from __future__ import annotations
 
+import importlib.util
 import platform
 import shutil
 import socket
@@ -21,7 +22,23 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from typing import Optional
+
+
+def repo_root() -> Path:
+    """Find the Argos repo root (where argos.config.example.yml lives).
+
+    Walk up from the current directory looking for that marker; fall back to the
+    cwd. Shared by the setup checker and the menu so both anchor on the same
+    place when invoking docker compose / the demo.
+    """
+
+    here = Path.cwd().resolve()
+    for directory in (here, *here.parents):
+        if (directory / "argos.config.example.yml").is_file():
+            return directory
+    return here
 
 
 class Status(str, Enum):
@@ -184,6 +201,81 @@ def check_aws_credentials() -> CheckResult:
     )
 
 
+def check_aws_identity() -> CheckResult:
+    """Resolve the caller's AWS identity via STS — a real network call.
+
+    Unlike :func:`check_aws_credentials` (local only), this proves the resolved
+    credentials actually work by asking STS "who am I?", and returns the IAM ARN
+    so the menu can show a friendly "Connected as ..." confirmation. Any failure
+    (no creds, no network, bad keys) collapses to a WARN with guidance — it never
+    raises.
+    """
+
+    if shutil.which("aws") is None:
+        return CheckResult("AWS identity", Status.WARN, "AWS CLI not installed",
+                           guidance=_aws_guidance())
+    rc, out = _run(
+        ["aws", "sts", "get-caller-identity", "--query", "Arn", "--output", "text"],
+        timeout=12.0,
+    )
+    arn = _first_line(out)
+    if rc == 0 and arn and arn.lower() != "none":
+        return CheckResult("AWS identity", Status.OK, arn)
+    return CheckResult(
+        "AWS identity",
+        Status.WARN,
+        "could not resolve an identity",
+        guidance="Run `aws configure` (or check your network/keys); "
+                 "set ARGOS_BEDROCK_MOCK=1 to skip AWS entirely.",
+    )
+
+
+def bedrock_access_note() -> str:
+    """One-line reminder that Bedrock model access is separate from credentials."""
+
+    return ("Bedrock also needs MODEL ACCESS enabled for your model in the AWS console "
+            "(Bedrock -> Model access) - that's separate from `aws configure` creds.")
+
+
+# --- Python-package probes ------------------------------------------------
+# Packages the backend + demo need beyond the SDK's own deps. Console-only mode
+# works without them, so each absence is a WARN (not a hard failure) - but the
+# ingest consumer, the dashboard round-trip, and real Bedrock runs all need them.
+# (pip name, import name, what it's for).
+PYTHON_PACKAGES: list[tuple[str, str, str]] = [
+    ("confluent-kafka", "confluent_kafka", "SDK Kafka sink + the ingest consumer"),
+    ("clickhouse-connect", "clickhouse_connect", "consumer writes + the 'verify' step read ClickHouse"),
+    ("boto3", "boto3", "the demo agents call AWS Bedrock"),
+]
+
+
+def check_python_package(pip_name: str, import_name: str, purpose: str) -> CheckResult:
+    """Is an importable package present? Reports a WARN with install guidance if not.
+
+    Uses ``importlib.util.find_spec`` so we never actually import (and possibly
+    run) the package - we only ask whether Python could find it.
+    """
+
+    try:
+        found = importlib.util.find_spec(import_name) is not None
+    except (ImportError, ValueError):  # a broken/namespace package shouldn't crash us
+        found = False
+    if found:
+        return CheckResult(pip_name, Status.OK, "installed")
+    return CheckResult(
+        pip_name,
+        Status.WARN,
+        f"not installed - needed so {purpose}",
+        guidance="Install everything in one go:  pip install -r requirements-all.txt",
+    )
+
+
+def check_python_packages() -> list[CheckResult]:
+    """Run all the backend/demo package probes, in declaration order."""
+
+    return [check_python_package(*spec) for spec in PYTHON_PACKAGES]
+
+
 # --- backend-readiness probes (used by setup C3 and menu C4) --------------
 # The stack's host ports, from docker-compose.yml. Name → port.
 STACK_PORTS: dict[str, int] = {
@@ -203,6 +295,51 @@ def port_in_use(port: int, host: str = "127.0.0.1", timeout: float = 0.5) -> boo
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(timeout)
         return sock.connect_ex((host, port)) == 0
+
+
+def http_ok(url: str, timeout: float = 1.5) -> bool:
+    """True if an HTTP GET to ``url`` returns a 2xx status. Stdlib only.
+
+    A TCP port opening doesn't mean a service can answer yet (ClickHouse opens
+    :8123 seconds before it serves queries). This is the stronger 'really ready'
+    probe used for the menu's health check.
+    """
+
+    import urllib.error
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as resp:
+            return 200 <= resp.status < 300
+    except (urllib.error.URLError, OSError):
+        return False
+
+
+def clickhouse_ready(host: str = "localhost", port: int = 8123) -> bool:
+    """True once ClickHouse can actually serve (its /ping returns 200)."""
+
+    return http_ok(f"http://{host}:{port}/ping")
+
+
+def kafka_ready(bootstrap: str = "localhost:29092", timeout: float = 4.0) -> bool:
+    """True once the Kafka broker actually answers (not just an open port).
+
+    The broker's port opens several seconds before it can serve produce/metadata
+    requests, so a producer that fires too early silently drops its messages. We
+    ask the broker for cluster metadata via the admin client — that only succeeds
+    once it's genuinely ready. Falls back to a port check if confluent-kafka isn't
+    installed (e.g. an SDK-only environment).
+    """
+
+    try:
+        from confluent_kafka.admin import AdminClient
+    except ImportError:
+        return port_in_use(29092)
+    try:
+        metadata = AdminClient({"bootstrap.servers": bootstrap}).list_topics(timeout=timeout)
+        return metadata is not None
+    except Exception:  # noqa: BLE001 - broker not up yet / connection refused
+        return False
 
 
 def check_compose_valid(compose_file: Optional[str] = None) -> CheckResult:

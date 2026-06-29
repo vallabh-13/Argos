@@ -27,20 +27,6 @@ from .checks import CheckResult, Status
 from . import console
 
 
-def _repo_root() -> Path:
-    """Find the repo root (where argos.config.example.yml lives).
-
-    Walk up from the current directory looking for the marker file; fall back to
-    cwd. The config files live at the repo root, so that's our anchor.
-    """
-
-    here = Path.cwd().resolve()
-    for directory in (here, *here.parents):
-        if (directory / "argos.config.example.yml").is_file():
-            return directory
-    return here
-
-
 def _render(result: CheckResult) -> None:
     marker = {
         Status.OK: console.MARK_OK,
@@ -81,6 +67,20 @@ def _check_ports() -> list[str]:
     return lines
 
 
+def _backend_seems_up() -> bool:
+    """True when the core stack already looks like it's running.
+
+    A fast port check on the three user-facing services (Kafka, ClickHouse,
+    Grafana). Good enough to decide whether the closing tip should say "start the
+    backend" or "the backend's already up — just run the demo". We keep it to a
+    port probe so setup stays quick and stdlib-only.
+    """
+
+    return (checks.port_in_use(29092)
+            and checks.port_in_use(8123)
+            and checks.port_in_use(3000))
+
+
 def run_setup(argv: Optional[list[str]] = None) -> int:
     """Run all checks + safe setup; print a report; return an exit code.
 
@@ -97,7 +97,7 @@ def run_setup(argv: Optional[list[str]] = None) -> int:
                         help="don't create argos.config.yml from the example")
     args = parser.parse_args(argv)
 
-    root = _repo_root()
+    root = checks.repo_root()
 
     print(console.bold("Argos setup - checking your machine"))
     print(console.dim("Reports what's installed; never installs system software for you."))
@@ -113,13 +113,20 @@ def run_setup(argv: Optional[list[str]] = None) -> int:
     for r in prereqs:
         _render(r)
 
-    # 2. AWS (optional — mock mode needs none of it).
+    # 2. Python packages the backend + demo need (warnings, not failures).
+    console.heading("Python packages (backend + demo)")
+    pkg_results = checks.check_python_packages()
+    for r in pkg_results:
+        _render(r)
+
+    # 3. AWS (optional — mock mode needs none of it).
     console.heading("AWS (optional - for real Bedrock runs)")
     aws_results = [checks.check_aws_cli(), checks.check_aws_credentials()]
     for r in aws_results:
         _render(r)
+    print("       " + console.dim(console.ARROW + " " + checks.bedrock_access_note()))
 
-    # 3. Safe auto-setup.
+    # 4. Safe auto-setup.
     console.heading("Project setup")
     if args.no_config:
         console.line(console.MARK_INFO, "Config file", "skipped (--no-config)")
@@ -127,12 +134,12 @@ def run_setup(argv: Optional[list[str]] = None) -> int:
         _render(_ensure_config(root))
     _render(checks.check_compose_valid(str(root / "docker-compose.yml")))
 
-    # 4. Backend readiness — ports, no `up`.
+    # 5. Backend readiness — ports, no `up`.
     console.heading("Backend readiness (ports - not starting anything)")
     for ln in _check_ports():
         print(ln)
 
-    # 5. Verdict.
+    # 6. Verdict.
     required = {
         "Python >= 3.10": prereqs[0],
         "Docker": prereqs[1],
@@ -155,10 +162,20 @@ def run_setup(argv: Optional[list[str]] = None) -> int:
                           "'Start backend'."))
         return 0
 
+    missing_pkgs = [r.name for r in pkg_results if r.status is not Status.OK]
     any_aws_warn = any(r.status is Status.WARN for r in aws_results)
-    detail = "all prerequisites present"
+    detail = "all system prerequisites present"
     if any_aws_warn:
         detail += " (AWS not configured - mock mode still works)"
     console.line(console.MARK_OK, "Ready", detail)
-    print(console.dim("       Next: `python -m argos` -> 'Start backend', then 'Run demo'."))
+    if missing_pkgs:
+        console.line(console.MARK_WARN, "Python packages missing",
+                     ", ".join(missing_pkgs))
+        print(console.dim("       The backend/demo need these. Install all with:  "
+                          "pip install -r requirements-all.txt"))
+    if _backend_seems_up():
+        print(console.dim("       The backend is already running (stack ports are in use)."))
+        print(console.dim("       Next: `python -m argos` -> 'Run demo', then 'Open dashboard'."))
+    else:
+        print(console.dim("       Next: `python -m argos` -> 'Start backend', then 'Run demo'."))
     return 0

@@ -38,10 +38,10 @@ per-run cost that single-agent tools miss.
 - `backend/correlation/` — the causal-stitching engine (the core)
 - `backend/detection/` — loop / failure / cost-spike rules
 - `backend/storage/` — ClickHouse schema + access
-- `dashboard/` — Grafana configs (+ optional React)
 - `examples/research-assistant/` — the bundled multi-agent demo
-- `deploy/helm/`, `deploy/terraform/` — Kubernetes + AWS provisioning
+- `deploy/` — Grafana + Prometheus configs for the `docker compose` stack
 - `docs/` — quickstart, architecture, guides
+- `scripts/` — `bootstrap.py` + `setup`/`setup.cmd` (fresh-clone setup)
 
 ## Non-negotiable rules
 - **Security first:** the SDK must redact secrets (API keys, tokens, passwords)

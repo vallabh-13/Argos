@@ -7,7 +7,7 @@
   "refresh": "10s",
   "schemaVersion": 39,
   "tags": ["argos"],
-  "time": { "from": "now-15m", "to": "now" },
+  "time": { "from": "now-24h", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
   "templating": {

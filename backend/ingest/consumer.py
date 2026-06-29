@@ -28,6 +28,7 @@ import json
 import os
 import sys
 import time
+from typing import Optional
 
 from backend.storage.clickhouse import get_client, insert_spans, span_dict_to_row
 
@@ -64,6 +65,31 @@ def _flush(client, consumer, batch) -> None:
     print(f"[argos-ingest] inserted {len(batch)} span(s)")
 
 
+def connect_clickhouse(timeout: float = 60.0, interval: float = 2.0):
+    """Get a ClickHouse client, retrying until the server actually serves queries.
+
+    Right after `docker compose up`, ClickHouse's TCP port opens seconds before
+    it can answer HTTP queries, and its `argos` database is created by an init
+    script that may not have run yet. A plain ``get_client()`` then crashes. So we
+    retry connect+``SELECT 1`` with backoff — which is exactly what lets the menu
+    start this consumer the moment the backend comes up, with no race.
+    """
+
+    deadline = time.monotonic() + timeout
+    last_error: Optional[Exception] = None
+    while time.monotonic() < deadline:
+        try:
+            client = get_client()
+            client.query("SELECT 1")  # prove it's serving, not just listening
+            return client
+        except Exception as exc:  # noqa: BLE001 - connection refused / db missing / etc.
+            last_error = exc
+            print(f"[argos-ingest] waiting for ClickHouse to be ready... ({exc})",
+                  file=sys.stderr)
+            time.sleep(interval)
+    raise RuntimeError(f"ClickHouse not reachable after {timeout:.0f}s: {last_error}")
+
+
 def run() -> None:
     from confluent_kafka import KafkaError
 
@@ -74,7 +100,7 @@ def run() -> None:
 
     consumer = build_consumer()
     consumer.subscribe([TOPIC])
-    client = get_client()
+    client = connect_clickhouse()
 
     batch: list[list] = []
     last_flush = time.monotonic()

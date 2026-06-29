@@ -1,4 +1,4 @@
-"""The LLM client the demo agents call — AWS Bedrock (Claude 3 Haiku) or a mock.
+"""The LLM client the demo agents call — AWS Bedrock (Claude Haiku 4.5) or a mock.
 
 Two implementations behind one tiny interface (``.converse(system, messages)``
 returning an :class:`LLMResult`):
@@ -72,7 +72,7 @@ class MockLLM:
 
 
 class BedrockLLM:
-    """Calls Claude 3 Haiku via the Bedrock Converse API."""
+    """Calls the configured Bedrock model (Claude Haiku 4.5 by default) via Converse."""
 
     def __init__(
         self,
@@ -110,10 +110,10 @@ class BedrockLLM:
 
         Some Bedrock models can't be invoked by their bare foundation-model id and
         return a ValidationException telling you to use a *cross-region inference
-        profile* (e.g. ``us.anthropic...``). Claude 3 Haiku in us-east-1 normally
-        doesn't, but if it ever does we don't crash: we detect that specific error,
-        retry once with the ``us.``-prefixed profile id, and tell the user how to
-        make it permanent via ``ARGOS_BEDROCK_MODEL``.
+        profile* (e.g. ``us.anthropic...``) — Claude Haiku 4.5 is one of them. When
+        that happens we don't crash: we detect that specific error, retry once with
+        the ``us.``-prefixed profile id, and tell the user how to make it permanent
+        via ``ARGOS_BEDROCK_MODEL``.
         """
 
         from botocore.exceptions import ClientError

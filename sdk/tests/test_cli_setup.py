@@ -54,3 +54,18 @@ def test_ensure_config_creates_then_is_idempotent(tmp_path):
 def test_ensure_config_warns_without_example(tmp_path):
     # No example file present → warn, don't crash.
     assert setup._ensure_config(tmp_path).status is Status.WARN
+
+
+def test_http_ok_false_for_closed_port():
+    # Nothing listening here → False, quickly, without raising.
+    assert checks.http_ok("http://127.0.0.1:9/ping", timeout=0.5) is False
+
+
+def test_backend_seems_up_requires_all_core_ports(monkeypatch):
+    # All three core ports in use -> the closing tip should say "already running".
+    monkeypatch.setattr(setup.checks, "port_in_use", lambda *a, **k: True)
+    assert setup._backend_seems_up() is True
+
+    # Any one core port free -> not up (so we still say "start the backend").
+    monkeypatch.setattr(setup.checks, "port_in_use", lambda port, *a, **k: port != 3000)
+    assert setup._backend_seems_up() is False

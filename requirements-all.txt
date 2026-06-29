@@ -1,0 +1,20 @@
+# Argos — install EVERYTHING in one command, from the repo root:
+#
+#     pip install -r requirements-all.txt
+#
+# This pulls in all three layers a full local run needs:
+#   * the Argos SDK in editable mode, with the Kafka sink   ->  -e ./sdk[kafka]
+#   * the backend pipeline deps (Kafka consumer, ClickHouse client, Prometheus)
+#   * the demo's AWS Bedrock deps (boto3, python-dotenv)
+#
+# Console-only users who never touch the backend can install just the SDK
+# (`pip install -e sdk`), but most people want the whole thing — hence this file.
+#
+# SECRETS ARE NEVER INSTALLED OR STORED HERE. AWS credentials come from the
+# standard chain (`aws configure` / an attached IAM role), never from a file.
+#
+# Note: run this from the repo root so the relative paths below resolve.
+
+-e ./sdk[kafka]
+-r backend/requirements.txt
+-r examples/research-assistant/requirements.txt
