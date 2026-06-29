@@ -10,7 +10,7 @@ SDK emits this model, the ingest pipeline (Phase 2) stores it, and the
 correlation engine (Phase 3) stitches it — so keeping it small and pure makes
 every other phase easier to build and test.
 
-Field reference: docs/PROJECT.md §05 (Span + Storage Schema).
+Field reference: backend/storage/schema.sql (the ClickHouse columns).
 """
 
 from __future__ import annotations

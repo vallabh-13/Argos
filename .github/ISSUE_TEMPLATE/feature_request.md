@@ -26,7 +26,7 @@ Other approaches you thought about, and why this one seems better.
 ## Scope check
 
 Argos focuses on **multi-agent** tracing over MCP/A2A. Does this fit that focus,
-or is it out of scope (see the "Out of scope" list in `docs/PROJECT.md`)?
+or is it out of scope (see the README for what Argos does and does not cover)?
 
 ## Anything else
 

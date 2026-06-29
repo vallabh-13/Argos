@@ -19,7 +19,7 @@ Two design choices worth understanding:
   ONLY after a batch is safely in ClickHouse. If the process dies mid-batch, on
   restart it re-reads from the last committed offset — so we never lose a span.
   The tradeoff: a crash between insert and commit can re-insert a batch, i.e.
-  duplicates are possible (plain MergeTree doesn't dedupe). See docs/PROJECT.md.
+  duplicates are possible (plain MergeTree doesn't dedupe).
 """
 
 from __future__ import annotations

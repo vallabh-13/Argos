@@ -2,7 +2,7 @@
 
 > Claude Code reads this automatically at the start of every session.
 > Keep it tight (50–150 lines). The README.md is the real source of truth;
-> docs/PROJECT.md is the distilled plan. Link, don't duplicate.
+> link to it, don't duplicate.
 
 ## What Argos is (read this first)
 Argos is **OpenTelemetry-native distributed tracing for multi-agent AI systems**.
@@ -54,7 +54,7 @@ per-run cost that single-agent tools miss.
 ## How to work with me
 - I'm LEARNING (aspiring cloud/platform engineer). After writing code, explain
   what it does and WHY in plain language.
-- Build **one phase at a time** (see docs/PROJECT.md → Implementation Plan).
+- Build **one phase at a time** (see the roadmap in README.md).
   Stop and let me run/test before moving to the next phase.
 - Each phase must end in something demonstrable.
 - Show me the plan before large multi-file changes. Ask instead of guessing.

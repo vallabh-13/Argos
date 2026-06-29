@@ -7,7 +7,7 @@
 ![Python](https://img.shields.io/badge/python-3.10%2B-green)
 ![CI](https://img.shields.io/badge/CI-passing-brightgreen)
 
-> **Status.** A working demo, built in public as a learning project by an aspiring cloud and platform engineer. The local stack runs end to end with one command and a guided console. It is not production hardened, and the roadmap below is honest about what is done and what is still planned.
+> **Status.** A working demo and a student project, built to learn. The local stack runs end to end with one command and a guided console. It is not production ready, and the roadmap below is honest about what is done and what is next.
 
 ![Argos architecture](docs/images/architecture.png)
 
@@ -29,7 +29,6 @@
 - [Project status and roadmap](#project-status-and-roadmap)
 - [Project structure](#project-structure)
 - [Limitations](#limitations)
-- [Contributing](#contributing)
 - [License](#license)
 
 ---
@@ -60,29 +59,9 @@ Everything technical in this document is simply how those three jobs are done we
 
 ## Architecture
 
-The system has three layers: an **SDK** that lives inside your application, a **backend pipeline** that runs as containers, and a **dashboard**. The diagram above shows how a span travels from your agents all the way to Grafana.
+The system has three layers: an **SDK** that lives inside your application, a **backend pipeline** that runs as containers, and a **dashboard**. The architecture diagram at the top of this README, also saved at `docs/images/architecture.png`, shows how a span travels from your agents all the way to Grafana.
 
 Read it as a story. The SDK records each step and publishes it to Kafka. Kafka safely carries the flood of records. The ingest consumer drains Kafka into ClickHouse. A watch loop reads spans, reconstructs the causal tree, writes the assembled trace back to ClickHouse, and reports any findings to Prometheus. Grafana reads from ClickHouse and Prometheus and draws the picture for a human.
-
-```mermaid
-flowchart LR
-    subgraph APP["Example Multi-Agent App"]
-        O[Orchestrator Agent] -->|A2A| S[Search Agent]
-        S -->|A2A| Z[Summarizer Agent]
-        S -->|MCP| T[(Web Search Tool)]
-    end
-    APP -->|LLM call| BR[AWS Bedrock<br/>Claude Haiku]
-    APP -->|emits OTel spans<br/>secrets redacted at source| K[[Kafka]]
-    K --> C[Ingest Consumer]
-    C --> CH[(ClickHouse)]
-    CH --> COR[Correlation Engine]
-    COR --> CH
-    COR --> DET[Detection Engine]
-    DET --> P[Prometheus]
-    CH --> G[Grafana Dashboard]
-    P --> G
-    G --> U((User))
-```
 
 ## How a trace flows
 
@@ -117,7 +96,7 @@ Each choice is deliberate. For several of them a lighter option would be enough 
 | CI | GitHub Actions | Tests on every push |
 | Cloud target | AWS (EKS, MSK, S3) | *Planned* |
 
-> **A note for interviews.** You do not strictly need Kafka or Kubernetes at this data volume. They are included on purpose to demonstrate the production pattern. The senior framing is to say exactly that: at this scale a lighter queue would be enough, and Kafka is here to show the design that scales. Knowing the tradeoff, not just the tool, is the signal.
+> **Why these tools.** At this size, simpler tools would do the job. Kafka and Kubernetes are here on purpose, to show the setup that works at large scale.
 
 ## Security
 
@@ -216,10 +195,14 @@ Built in dependency order, so each phase ends with something you can run and sho
 - **Phase 5, Dashboard.** Grafana is provisioned automatically, with panels that go red when a finding fires.
 - **Phase 6, Usability and the real demo.** A bundled multiagent research assistant on AWS Bedrock (orchestrator to search to summarizer, over A2A and MCP), a detailed trace view and a left to right sequence diagram, the AWS credential chain instead of secrets in files, a single config file, and a **guided console** that brings up the whole stack, consumer and detector included, and walks you through instrumenting your own agents.
 
-**Planned:**
+**Planned and being worked on:**
 
-- **Phase 7, Cloud deployment.** Kubernetes manifests with a Helm chart, and Terraform for an AWS deployment.
-- **Ongoing, Upstream contributions.** Fixing real gaps in the surrounding open source projects as they come up.
+These next steps all aim at one goal, making Argos the clearest possible answer to the question "why did this team of agents fail?"
+
+- **Sharper correlation.** Handle more handoff shapes and traces that arrive partial or out of order, so the timeline stays correct even on messy runs.
+- **Smarter detection.** More failure patterns and tunable thresholds, so more problems get caught early.
+- **A clearer trace view.** A view built for multiagent runs, so the story is obvious at a glance.
+- **Even easier adoption.** Keep wrapping any agent app to a two line change, with more examples to copy from.
 
 ## Project structure
 
@@ -233,7 +216,6 @@ argos/
   scripts/                    bootstrap.py and the setup launchers
   .github/
     workflows/ci.yml          tests and build on every push
-    CONTRIBUTING.md
   sdk/                        the Python SDK
     argos/
       tracing.py              span emission on OpenTelemetry
@@ -269,15 +251,6 @@ Argos is an open source project built to demonstrate and learn multiagent observ
 - It prioritizes depth on the correlation problem over broad feature coverage.
 
 This honesty is intentional. A small tool that does one hard thing well, and says clearly what it does not do, is more credible than one that overpromises.
-
-## Contributing
-
-Contributions are welcome. This project is built in public on purpose.
-
-- Read `.github/CONTRIBUTING.md` for setup and the development workflow.
-- Good first issues are labeled `good first issue`.
-- Open an issue before large changes so we can agree on direction.
-- All contributions are under the Apache 2.0 license.
 
 ## License
 

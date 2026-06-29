@@ -7,8 +7,7 @@ multi-agent interactions Argos exists to trace:
 * :func:`mcp_tool_call` — an agent calling a tool over MCP (a ``tool_call`` span).
 
 Both stamp standardized ``a2a.*`` / ``mcp.*`` attributes so the correlation engine
-and dashboard can show who-handed-what-to-whom and which tool was invoked. See
-docs/PROJECT.md.
+and dashboard can show who-handed-what-to-whom and which tool was invoked.
 """
 
 from .a2a import a2a_handoff
